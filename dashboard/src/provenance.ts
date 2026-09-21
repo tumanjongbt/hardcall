@@ -6,6 +6,11 @@ export const LIVE_EVENT_SOURCES = new Set([
   "scorecard",
   "apprenticeship_gov",
   "bls_ep",
+  "ipeds",
+  "careeronestop",
+  "census",
+  "bea",
+  "fred",
 ]);
 
 export type BadgeKind = "live" | "demo";
@@ -25,6 +30,11 @@ const EVENT_SOURCE_BADGES: Record<string, SourceBadge> = {
   scorecard: { label: "Live · Scorecard", kind: "live" },
   apprenticeship_gov: { label: "Live · Apprenticeship", kind: "live" },
   bls_ep: { label: "Live · BLS EP", kind: "live" },
+  ipeds: { label: "Live · IPEDS", kind: "live" },
+  careeronestop: { label: "Live · CareerOneStop", kind: "live" },
+  census: { label: "Live · Census", kind: "live" },
+  bea: { label: "Live · BEA", kind: "live" },
+  fred: { label: "Live · FRED", kind: "live" },
   unknown: { label: "Unknown", kind: "demo" },
 };
 
@@ -41,11 +51,9 @@ export function eventSourceBadge(value: unknown): SourceBadge {
 }
 
 export function insightSourceBadge(value: unknown): SourceBadge {
-  if (value === "bls") return { label: "Live · BLS", kind: "live" };
-  if (value === "bls_ep") return { label: "Live · BLS EP", kind: "live" };
-  if (value === "onet") return { label: "Live · O*NET", kind: "live" };
-  if (value === "scorecard") return { label: "Live · Scorecard", kind: "live" };
-  if (value === "apprenticeship_gov") return { label: "Live · Apprenticeship", kind: "live" };
+  if (typeof value === "string" && isLiveEventSource(value)) {
+    return EVENT_SOURCE_BADGES[value] ?? { label: "Demo KPI", kind: "demo" };
+  }
   if (value === "manual") return { label: "Manual", kind: "demo" };
   if (value === "unknown") return { label: "Unknown", kind: "demo" };
   return { label: "Demo KPI", kind: "demo" };
@@ -86,4 +94,4 @@ export function eventStampKind(fetchedAt: string | null | undefined): "fetched" 
 }
 
 export const ATTRIBUTION =
-  "Data: U.S. Department of Education College Scorecard · U.S. Bureau of Labor Statistics OEWS · O*NET Database by USDOL/ETA (CC BY 4.0; O*NET® is a trademark of USDOL/ETA) · U.S. Department of Labor registered apprenticeship partner sponsors. Live badges are server-side adapters only.";
+  "Data: U.S. Department of Education College Scorecard (institution / program cost of attendance, not per-course sticker) · U.S. Bureau of Labor Statistics OEWS · O*NET Database by USDOL/ETA (CC BY 4.0; O*NET® is a trademark of USDOL/ETA) · U.S. Department of Labor registered apprenticeship partner sponsors. Live badges are server-side adapters only. CareerOneStop (DOLETA + DEED) attribution is required if those rows appear; Bing geocodes must never be stored.";

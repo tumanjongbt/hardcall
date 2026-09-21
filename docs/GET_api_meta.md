@@ -18,7 +18,7 @@ No auth. `Content-Type` is not required.
 {
   "ok": true,
   "allow_demo": false,
-  "live_sources": ["bls", "onet", "scorecard", "apprenticeship_gov", "bls_ep"],
+  "live_sources": ["bls", "onet", "scorecard", "apprenticeship_gov", "bls_ep", "ipeds", "careeronestop", "census", "bea", "fred"],
   "warehouse": {
     "institutions": 6243,
     "programs": 81504,

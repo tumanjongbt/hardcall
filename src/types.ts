@@ -8,6 +8,11 @@ export type EventSource =
   | "scorecard"
   | "apprenticeship_gov"
   | "bls_ep"
+  | "ipeds"
+  | "careeronestop"
+  | "census"
+  | "bea"
+  | "fred"
   | "unknown";
 
 export type InsightSource =
@@ -18,6 +23,11 @@ export type InsightSource =
   | "scorecard"
   | "apprenticeship_gov"
   | "bls_ep"
+  | "ipeds"
+  | "careeronestop"
+  | "census"
+  | "bea"
+  | "fred"
   | "unknown";
 
 export type CreateEvent = {

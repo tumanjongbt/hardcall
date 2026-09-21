@@ -4,11 +4,13 @@ Production must not serve synthetic / playground / CLI / seed rows as if they we
 
 ## Supabase (SQL editor)
 
-1. Paste `migrations/006_domain_warehouse.sql` in full.
-2. Record the stem:
+1. Paste `migrations/006_domain_warehouse.sql` in full, then `007_reserved_live_sources.sql`.
+2. Record the stems:
 
 ```sql
 INSERT INTO schema_migrations (id) VALUES ('006_domain_warehouse')
+ON CONFLICT (id) DO NOTHING;
+INSERT INTO schema_migrations (id) VALUES ('007_reserved_live_sources')
 ON CONFLICT (id) DO NOTHING;
 ```
 
@@ -37,7 +39,9 @@ DELETE FROM insights WHERE source = 'synthetic';
 | `HARDCALL_ALLOW_DEMO` | **`false`** |
 | `NODE_ENV` | `production` (Render sets this) |
 
-Do **not** put API keys or `DATABASE_URL` in the Vite dashboard build. Optional later keys (`SCORECARD_API_KEY`, `BLS_API_KEY`, `ONET_API_KEY`, `DOL_API_KEY`) stay on Render only. Phase A is keyless bulk feeds.
+Do **not** put API keys or `DATABASE_URL` in the Vite dashboard build. Optional later keys (`SCORECARD_API_KEY`, `BLS_API_KEY`, `ONET_API_KEY`, `DOL_API_KEY`, `CAREERONESTOP_USER_ID`, `CAREERONESTOP_API_TOKEN`, `CENSUS_API_KEY`, `BEA_API_KEY`, `FRED_API_KEY`) stay on Render only. **Phase A is keyless bulk** (Scorecard zips, OEWS tables, O\*NET DB). CareerOneStop is Phase B and **must never persist Bing geocodes**.
+
+Costs in the UI are **institution / program cost of attendance (College Scorecard)** — there is no national per-course price API.
 
 ## Render cron / worker
 

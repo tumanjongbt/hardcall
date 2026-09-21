@@ -7,6 +7,7 @@ import {
   isDemoInsightSource,
 } from "./demo_gate";
 import { EMPTY_WAREHOUSE_STATS, type Warehouse } from "./ingest/warehouse";
+import { LIVE_SOURCES } from "./live_sources";
 import { createSseHub, type SseHub } from "./sse_hub";
 import type { ListEventsQuery, Store } from "./types";
 
@@ -126,7 +127,7 @@ export function createApp(
     return reply.send({
       ok: true,
       allow_demo: allowDemo,
-      live_sources: ["bls", "onet", "scorecard", "apprenticeship_gov", "bls_ep"],
+      live_sources: [...LIVE_SOURCES],
       warehouse,
     });
   });

@@ -63,6 +63,11 @@ fail(
   "reserved"
 );
 fail({ channel: "university", title: "x", source: "bls_ep" }, "source", "reserved");
+fail({ channel: "university", title: "x", source: "ipeds" }, "source", "reserved");
+fail({ channel: "university", title: "x", source: "careeronestop" }, "source", "reserved");
+fail({ channel: "university", title: "x", source: "census" }, "source", "reserved");
+fail({ channel: "university", title: "x", source: "bea" }, "source", "reserved");
+fail({ channel: "university", title: "x", source: "fred" }, "source", "reserved");
 fail(
   { channel: "university", title: "x", source_url: "ftp://example.com" },
   "source_url",

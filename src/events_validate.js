@@ -1,5 +1,7 @@
 /** POST /api/events — boundary validation. Trust DB constraints after parse. */
 
+const { LIVE_SOURCES, LIVE_SOURCE_SET } = require("./live_sources");
+
 const CHANNELS = new Set([
   "university",
   "community_college",
@@ -16,20 +18,6 @@ const STAKEHOLDER_TAGS = new Set([
   "workforce_training_managers",
 ]);
 
-/** Stored / GET enum. Live reserved values are adapter-only. */
-const EVENT_SOURCES = new Set([
-  "synthetic",
-  "manual",
-  "playground",
-  "cli",
-  "bls",
-  "onet",
-  "scorecard",
-  "apprenticeship_gov",
-  "bls_ep",
-  "unknown",
-]);
-
 /** Writable on anonymous POST /api/events. */
 const PUBLIC_EVENT_SOURCES = new Set([
   "synthetic",
@@ -39,13 +27,10 @@ const PUBLIC_EVENT_SOURCES = new Set([
   "unknown",
 ]);
 
-const RESERVED_LIVE_SOURCES = new Set([
-  "bls",
-  "onet",
-  "scorecard",
-  "apprenticeship_gov",
-  "bls_ep",
-]);
+/** Stored / GET enum. Live reserved values are adapter-only. */
+const EVENT_SOURCES = new Set([...PUBLIC_EVENT_SOURCES, ...LIVE_SOURCES]);
+
+const RESERVED_LIVE_SOURCES = LIVE_SOURCE_SET;
 
 const DEFAULT_EVENT_SOURCE = "manual";
 

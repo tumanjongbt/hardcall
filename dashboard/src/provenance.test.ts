@@ -23,8 +23,16 @@ test("event source badges distinguish demo from live adapters", () => {
     kind: "live",
   });
   assert.deepEqual(eventSourceBadge(undefined), { label: "Unknown", kind: "demo" });
-  assert.equal(isLiveEventSource("bls"), true);
-  assert.equal(isLiveEventSource("scorecard"), true);
+  assert.deepEqual(eventSourceBadge("ipeds"), { label: "Live · IPEDS", kind: "live" });
+  assert.deepEqual(eventSourceBadge("careeronestop"), {
+    label: "Live · CareerOneStop",
+    kind: "live",
+  });
+  assert.deepEqual(eventSourceBadge("census"), { label: "Live · Census", kind: "live" });
+  assert.deepEqual(eventSourceBadge("bea"), { label: "Live · BEA", kind: "live" });
+  assert.deepEqual(eventSourceBadge("fred"), { label: "Live · FRED", kind: "live" });
+  assert.equal(isLiveEventSource("fred"), true);
+  assert.equal(isLiveEventSource("ipeds"), true);
   assert.equal(isLiveEventSource("synthetic"), false);
 });
 
@@ -33,6 +41,11 @@ test("insight synthetic is Demo KPI; missing source is also demo", () => {
   assert.deepEqual(insightSourceBadge(undefined), { label: "Demo KPI", kind: "demo" });
   assert.deepEqual(insightSourceBadge("bls"), { label: "Live · BLS", kind: "live" });
   assert.deepEqual(insightSourceBadge("scorecard"), { label: "Live · Scorecard", kind: "live" });
+  assert.deepEqual(insightSourceBadge("ipeds"), { label: "Live · IPEDS", kind: "live" });
+  assert.deepEqual(insightSourceBadge("careeronestop"), {
+    label: "Live · CareerOneStop",
+    kind: "live",
+  });
 });
 
 test("pipe status is SSE connection, not live market data", () => {
