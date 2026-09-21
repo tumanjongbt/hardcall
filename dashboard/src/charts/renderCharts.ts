@@ -31,13 +31,18 @@ import {
 import {
   CAPTIONS,
   EMPTY_COMPARE,
+  FORECAST_CHIP,
   FORECAST_NOTE,
   INFORMS,
   NON_ADVISORY,
+  PROJECTED_INTENSITY_LABEL,
   compareCaption,
   comparePairLabel,
+  forecastSeriesLabel,
+  historySeriesLabel,
   splitCaption,
   spikeCaption,
+  vintageStrip,
 } from "./copy";
 import {
   FORECAST_HORIZONS,
@@ -49,6 +54,7 @@ import {
   type DayBucket,
   type ForecastBand,
   type HeatMatrix,
+  type SeriesVintage,
   type SpikeDay,
   type StakeholderSlice,
 } from "./transforms";
@@ -65,7 +71,7 @@ export type ChartViewHandlers = {
 };
 
 const instances = new Map<string, Chart>();
-const SECONDARY_CHART_KEYS = ["doughnut", "stacked", "split", "tags"] as const;
+const SECONDARY_CHART_KEYS = ["doughnut", "stacked", "tags"] as const;
 let registered = false;
 let lastRender: {
   root: HTMLElement;
@@ -180,9 +186,12 @@ function panelTitle(text: string, id?: string): HTMLHeadingElement {
 function activityConfig(
   buckets: DayBucket[],
   forecast: ForecastBand,
-  spikes: SpikeDay[]
+  spikes: SpikeDay[],
+  vintage: SeriesVintage
 ): ChartConfiguration<"line"> {
   const spikeKeys = new Set(spikes.map((spike) => spike.key));
+  const histLabel = historySeriesLabel(buckets.length, vintage.asOf, vintage.source);
+  const forecastLabel = forecastSeriesLabel(forecast.horizon, vintage.asOf, vintage.source);
   const labels = [...buckets.map((bucket) => bucket.label), ...forecast.points.map((p) => p.label)];
   const hist = [
     ...buckets.map((bucket) => bucket.count),
@@ -216,7 +225,7 @@ function activityConfig(
       labels,
       datasets: [
         {
-          label: "History",
+          label: histLabel,
           data: hist,
           borderColor: CORONA,
           backgroundColor: "rgba(91, 44, 255, 0.18)",
@@ -228,7 +237,7 @@ function activityConfig(
           borderWidth: 2,
         },
         {
-          label: "Forecast",
+          label: forecastLabel,
           data: mean,
           borderColor: SIGNAL,
           backgroundColor: "transparent",
@@ -273,7 +282,7 @@ function activityConfig(
             color: PAPER,
             boxWidth: 12,
             padding: 12,
-            filter: (item) => item.text === "History" || item.text === "Forecast",
+            filter: (item) => item.datasetIndex === 0 || item.datasetIndex === 1,
           },
         },
         tooltip: { mode: "index", intersect: false },
@@ -612,7 +621,7 @@ function ensureShell(
 
   const activityCanvas = makeCanvas(
     "chart-activity",
-    `Event activity over the last ${days} days with a ${horizon}-day forecast band`
+    `Event activity over the last ${days} days with a ${horizon}-day naive forecast band`
   );
   const activity = el("section", "chart-panel chart-panel--wide");
   activity.id = "chart-activity-panel";
@@ -632,6 +641,14 @@ function ensureShell(
     horizonRow.append(button);
   }
   activityHead.append(horizonRow);
+  const trust = el("div", "chart-trust");
+  trust.id = "chart-trust";
+  trust.setAttribute("role", "note");
+  const chip = el("span", "non-advisory__chip chart-trust__chip", FORECAST_CHIP);
+  chip.title = NON_ADVISORY;
+  const vintage = el("p", "chart-trust__vintage");
+  vintage.id = "chart-trust-vintage";
+  trust.append(chip, vintage);
   const activityWrap = el("div", "chart-canvas-wrap");
   activityWrap.append(activityCanvas);
   const activityCaption = el("p", "chart-panel__caption chart-panel__caption--forecast");
@@ -639,6 +656,7 @@ function ensureShell(
   activity.append(
     activityHead,
     el("p", "chart-panel__caption", CAPTIONS.activity),
+    trust,
     activityWrap,
     activityCaption
   );
@@ -671,7 +689,7 @@ function ensureShell(
     "Automation resilience",
     "chart-canvas-wrap chart-canvas-wrap--doughnut",
     splitCanvas,
-    { inform: INFORMS.split }
+    { inform: CAPTIONS.split }
   );
   const meter = el("div", "resilience-meter");
   meter.id = "resilience-meter";
@@ -747,16 +765,16 @@ function ensureShell(
   tablePanel.append(tableHost);
 
   const primary = el("div", "charts-primary");
-  primary.append(activity, compare, tablePanel);
+  primary.append(activity, split, compare, tablePanel);
 
   const more = el("details", "charts-more");
   more.id = "charts-more";
   const summary = el("summary", "charts-more__summary", "More views");
-  summary.title = "Stacked mix, resilience, stakeholders, weekday heat, and per-path bars";
+  summary.title = "Stacked mix, stakeholders, weekday heat, and per-path bars";
   const moreBody = el("div", "charts-more__body");
   const mixGrid = el("div", "charts-grid");
-  mixGrid.append(doughnut, split);
-  moreBody.append(mixGrid, stacked, tags, heat, barsBlock);
+  mixGrid.append(doughnut, tags);
+  moreBody.append(mixGrid, stacked, heat, barsBlock);
   more.append(summary, moreBody);
   more.open = keepMoreOpen;
   more.addEventListener("toggle", () => {
@@ -796,18 +814,38 @@ function paintMeta(root: HTMLElement, model: ChartsModel, data: ChartData): void
   meta.textContent = `${model.events.length} matching · ${data.inRangeCount} in last ${data.days} days · ${data.horizon}d forecast · ${channel} · ${lens}${q}${compare}`;
 }
 
+function paintTrust(root: HTMLElement, data: ChartData): void {
+  const vintage = root.querySelector("#chart-trust-vintage");
+  if (vintage) {
+    vintage.textContent = vintageStrip(
+      data.days,
+      data.horizon,
+      data.vintage.asOf,
+      data.vintage.source
+    );
+  }
+}
+
 function paintActivityCaption(root: HTMLElement, data: ChartData): void {
   const node = root.querySelector("#chart-forecast-caption");
   if (!node) return;
   node.replaceChildren();
-  const chip = el("span", "non-advisory__chip", "Not advice");
-  chip.setAttribute("role", "note");
-  chip.title = NON_ADVISORY;
+  const first = data.forecast.points[0];
+  const last = data.forecast.points[data.forecast.points.length - 1];
+  const range =
+    first && last
+      ? `${first.label}–${last.label} (next ${data.horizon}d)`
+      : `next ${data.horizon}d`;
+  const uncertainty =
+    data.forecast.uncertainty === "high"
+      ? " High uncertainty: history is sparse, so the band is wide."
+      : " Band half-width is the historical daily SD.";
   const spikes = spikeCaption(data.spikes);
-  const note = spikes
-    ? `${FORECAST_NOTE} Band covers the next ${data.horizon} UTC days. ${spikes}`
-    : `${FORECAST_NOTE} Band covers the next ${data.horizon} UTC days.`;
-  node.append(chip, document.createTextNode(` ${note}`));
+  node.append(
+    document.createTextNode(
+      `${PROJECTED_INTENSITY_LABEL}. ${FORECAST_NOTE} Naive last-rate ${data.forecast.level} ± ${data.forecast.pad} over ${range}. As of ${data.vintage.asOf} from ${data.vintage.source}.${uncertainty}${spikes ? ` ${spikes}` : ""}`
+    )
+  );
 }
 
 function paintSplit(root: HTMLElement, data: ChartData): void {
@@ -939,8 +977,15 @@ function paintRanks(root: HTMLElement, ranks: ChannelRankRow[], days: number): v
 function paintPrimary(root: HTMLElement, data: ChartData): void {
   const activityCanvas = canvasOf(root, "#chart-activity");
   if (activityCanvas) {
-    upsert("line", activityCanvas, activityConfig(data.activity, data.forecast, data.spikes));
+    upsert(
+      "line",
+      activityCanvas,
+      activityConfig(data.activity, data.forecast, data.spikes, data.vintage)
+    );
   }
+  const splitCanvas = canvasOf(root, "#chart-split");
+  if (splitCanvas) upsert("split", splitCanvas, splitConfig(data));
+  paintSplit(root, data);
   paintCompare(root, data);
 }
 
@@ -951,13 +996,10 @@ function paintSecondary(root: HTMLElement, data: ChartData): void {
   }
   const doughnutCanvas = canvasOf(root, "#chart-channels");
   const stackedCanvas = canvasOf(root, "#chart-stacked");
-  const splitCanvas = canvasOf(root, "#chart-split");
   const tagsCanvas = canvasOf(root, "#chart-stakeholders");
   if (doughnutCanvas) upsert("doughnut", doughnutCanvas, doughnutConfig(data));
   if (stackedCanvas) upsert("stacked", stackedCanvas, stackedConfig(data));
-  if (splitCanvas) upsert("split", splitCanvas, splitConfig(data));
   if (tagsCanvas) upsert("tags", tagsCanvas, stakeholderConfig(data.stakeholders));
-  paintSplit(root, data);
   paintHeat(root, data.heat);
 
   const wantedBars = new Set(data.byChannel.map((series) => `bar:${series.channel}`));
@@ -1040,6 +1082,7 @@ export function renderCharts(
   });
   ensureShell(root, model, data, handlers);
   paintMeta(root, model, data);
+  paintTrust(root, data);
   paintActivityCaption(root, data);
   paintRanks(root, data.ranks, data.days);
   paintPrimary(root, data);

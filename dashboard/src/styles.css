@@ -765,10 +765,25 @@ body.has-insight-detail {
   color: var(--corona);
   font-family: "Avenir Next", "Segoe UI", sans-serif;
   font-size: 0.68rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  white-space: nowrap;
+  letter-spacing: 0.06em;
+  text-transform: none;
+  white-space: normal;
   box-shadow: 0 0 16px color-mix(in srgb, var(--corona) 38%, transparent);
+}
+
+.chart-trust {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+  margin: 0 0 10px;
+}
+
+.chart-trust__vintage {
+  margin: 0;
+  color: var(--paper-dim);
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .chart-canvas-wrap {

@@ -19,6 +19,7 @@ import {
   futureDayKeys,
   lastDayKeys,
   pathCompare,
+  seriesVintage,
   stackedDaily,
   stakeholderBreakdown,
 } from "./transforms";
@@ -308,30 +309,58 @@ test("chartDataFromEvents wires range, compare, and in-window doughnut together"
   assert.equal(data.ranks.length, 5);
   assert.equal(data.forecast.points.length, 14);
   assert.equal(data.forecast.points[0]?.key, "2026-09-22");
+  assert.equal(data.forecast.method, "naive-hist-band");
+  assert.equal(data.forecast.uncertainty, "high");
+  assert.equal(data.vintage.source, "GET /api/events");
+  assert.equal(data.vintage.asOf, "2026-09-21");
   assert.equal(data.split.resilienceScore, data.split.humanPercent);
 });
 
-test("forecastBand is 14 or 30 UTC days after today and stays non-negative", () => {
+test("forecastBand is a naive hist band for 14 or 30 UTC days and stays non-negative", () => {
   const keys = futureDayKeys(now, 14);
   assert.equal(keys.length, 14);
   assert.equal(keys[0], "2026-09-22");
   assert.equal(keys[13], "2026-10-05");
-  const activity = dailyActivity(rows, now, 30);
+  const activity = dailyActivity(rows, now, 90);
   const band14 = forecastBand(activity, now, 14);
   const band30 = forecastBand(activity, now, 30);
+  assert.equal(band14.method, "naive-hist-band");
   assert.equal(band14.points.length, 14);
   assert.equal(band30.points.length, 30);
   for (const point of band30.points) {
     assert.ok(point.low >= 0);
     assert.ok(point.mean >= point.low);
     assert.ok(point.high >= point.mean);
+    assert.ok(point.high > point.low);
   }
   const flat = forecastBand(
-    lastDayKeys(now, 30).map((key) => ({ key, label: key, count: 4 })),
+    lastDayKeys(now, 90).map((key) => ({ key, label: key, count: 4 })),
     now,
     14
   );
-  assert.ok(flat.points.every((point) => point.mean >= 3 && point.mean <= 5));
+  assert.equal(flat.method, "naive-hist-band");
+  assert.equal(flat.uncertainty, "normal");
+  assert.ok(flat.points.every((point) => point.mean === 4));
+});
+
+test("same-day seed still gets a wide naive band", () => {
+  const sameDay = lastDayKeys(now, 90).map((key, index, list) => ({
+    key,
+    label: key,
+    count: index === list.length - 1 ? 80 : 0,
+  }));
+  const band = forecastBand(sameDay, now, 30);
+  assert.equal(band.method, "naive-hist-band");
+  assert.equal(band.uncertainty, "high");
+  assert.equal(band.points.length, 30);
+  assert.equal(band.level, 80);
+  assert.ok(band.pad >= 80);
+});
+
+test("seriesVintage is as-of the latest event day from GET /api/events", () => {
+  const vintage = seriesVintage(rows, now);
+  assert.equal(vintage.asOf, "2026-09-21");
+  assert.equal(vintage.source, "GET /api/events");
 });
 
 test("detectSpikes flags days well above the window run-rate", () => {

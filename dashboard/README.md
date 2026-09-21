@@ -57,7 +57,7 @@ These query keys are written with `history.pushState` when a person changes filt
 | `q` | omitted | search over title, description, tags (300ms debounce) |
 | `insight` | omitted | insight id; opens the analysis drawer on the Market Insights tab |
 | `lens` | omitted (`All`) | Charts audience lens: `students` · `parents` · `counselors` · `workforce` (`stakeholder=` is an alias; raw tags like `career_counselors` also parse) |
-| `range` | omitted (`30`) | Charts lookback: `7` · `14` · `30` · `90` (90-day history) |
+| `range` | omitted (`90`) | Charts lookback: `7` · `14` · `30` · `90` (default 90-day history) |
 | `forecast` | omitted (`14`) | Charts forward band: `14` or `30` days |
 | `compare` | omitted (`trade,university`) | Two channels to compare, or `none` |
 
@@ -88,14 +88,14 @@ The new card should slide/flash in at the top of page 1 when it matches the curr
 
    - A one-line **decision statement** under the Charts title: which path is drawing signal, and is automation pressure rising?
    - Shared Events **channel chips + 300ms search**, then primary controls only: **Audience lens**, **Time range**, **Path compare** (two channels).
-   - **Activity + forecast** and **Path compare** at the top of the viz stack, then a compact **so-what** table. Secondary mix / resilience / heat / per-path bars stay behind a closed **More views** disclosure.
-   - A mandatory **Not advice** chip on the forecast (cannot be dismissed). Horizon chips (14/30) live on the activity card and write `forecast=`.
+   - **Activity + naive forecast**, **Automation resilience**, and **Path compare** at the top of the viz stack, then a compact **so-what** table. Secondary mix / heat / per-path bars stay behind a closed **More views** disclosure.
+   - A persistent **Non-advisory · not a wage or ROI guarantee** chip **on the activity/forecast chart** (not footer-only). Horizon chips (14/30) live on the activity card and write `forecast=`. Series show ranges plus as-of / `GET /api/events` vintage.
    - **Audience lens** (All / Students / Parents / Counselors / Workforce) — Students unions `high_school_students` + `college_students`. URL writes `lens=`.
-   - **Time range** 7 / 14 / 30 / **90** days (default 30). URL writes `range=`.
+   - **Time range** 7 / 14 / 30 / **90** days (**default 90**). URL writes `range=` when not 90. Empty days stay empty. The 14–30d band is a **naive last-rate ± hist SD** off the hist series (client-side only; no `forecast_snapshots`). Sparse history widens the band.
    - **Path compare** — select two channels (default Trade vs University). If both selected paths have zero events in the filtered window, the card says **No data for selected paths** (never a 0–0 tie). Empty path chips disable.
    - Change lens, range, channel, or search: after 300ms every visible chart **and** the data view update together. Share the URL. Below 600px, chart cards stay fluid-width with no page-level horizontal scroll.
 
-   Counselor recipe: set lens to **Students** (or **Parents**), range **30** (or **90** if you need the long hist), compare **Trade vs University**, and read the path-snapshot “so what” before the family meeting. Open **More views** only when you need mix, resilience, or weekday intensity.
+   **Backfill:** `POST /api/events` cannot set `created_at` (server stamps `now()`). Do not POST fake hist. Admin SQL into `events` only (no DDL): `node scripts/backfill-90d-events.js`. Memory API already spreads 90 days.
 
 7. **Market Insights tab** — switch to Market Insights (`?tab=insights`). KPI cards should appear (empty until `POST /api/insight`). Click a card: the drawer shows title, KPI value, and `detail` (or “No analysis yet for this insight.”). Esc / Close returns to the grid. Reload `?tab=insights&insight=<id>` should reopen that tile. Wait ~15s or POST a new/updated title and confirm the grid refreshes on the next poll without closing an open drawer.
 
