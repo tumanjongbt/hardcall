@@ -105,7 +105,8 @@
           <nav id="pagination" class="pagination" aria-label="Pagination"></nav>
 
           <p class="footnote">
-            History plus the live stream. Channel, search, and page stay in the URL.
+            History plus the SSE pipe. Badges show whether a row is demo, playground,
+            CLI, or live. Channel, search, and page stay in the URL.
           </p>
         </section>
 
@@ -118,7 +119,8 @@
           <section id="chart-filters" class="panel" aria-label="Chart decision filters"></section>
           <section id="charts" aria-label="Event charts"></section>
           <p class="footnote">
-            Same events as the feed. Forecast is telemetry, not a path recommendation.
+            Charts aggregate the event store (demo / playground / CLI until live BLS
+            and O*NET adapters ship). Forecast is telemetry, not a path recommendation.
           </p>
         </section>
 
@@ -133,7 +135,8 @@
           </div>
           <section id="insights" aria-label="Market insights" aria-live="polite"></section>
           <p class="footnote">
-            KPI cards refresh every 15 seconds. Click a card for the analysis.
+            KPI cards refresh every 15 seconds. <strong>Demo KPI</strong> means the
+            value is a seed, not a live BLS/O*NET feed. Click a card for the analysis.
           </p>
         </section>
 
@@ -171,8 +174,9 @@
               ></p>
               <p class="panel-lede">
                 Compose a career-event payload, preview the exact <code>fetch()</code>
-                a scraper would fire, and post it at the live API. Fill Sample cycles
-                curated examples; the right pane updates as you type.
+                a scraper would fire, and post it at the configured API with
+                <code>source: "playground"</code>. Fill Sample cycles curated examples;
+                the right pane updates as you type.
               </p>
               <form id="playground-form" class="playground-form" novalidate>
                 <label class="control-label" for="playground-channel">Channel *</label>

@@ -1,6 +1,12 @@
 import { createApp } from "./app";
 import type { CreateEvent, CreateInsight, EventRow, InsightRow, Store } from "./types";
 
+const DEMO_PROVENANCE = {
+  source: "synthetic" as const,
+  source_url: null,
+  fetched_at: null,
+};
+
 const FIXTURES: CreateEvent[] = [
   {
     channel: "university",
@@ -8,6 +14,7 @@ const FIXTURES: CreateEvent[] = [
     description: "Bachelor's ROI still holds in software for this metro.",
     emoji: "📈",
     tags: ["college_students", "parents"],
+    ...DEMO_PROVENANCE,
   },
   {
     channel: "community_college",
@@ -15,6 +22,7 @@ const FIXTURES: CreateEvent[] = [
     description: "Waitlist opened after clinical seats filled.",
     emoji: "🏥",
     tags: ["high_school_students", "career_counselors"],
+    ...DEMO_PROVENANCE,
   },
   {
     channel: "trade",
@@ -22,6 +30,7 @@ const FIXTURES: CreateEvent[] = [
     description: "Evening cohort for working adults. Tools provided.",
     emoji: "🔧",
     tags: ["high_school_students", "workforce_training_managers"],
+    ...DEMO_PROVENANCE,
   },
   {
     channel: "apprenticeship",
@@ -29,6 +38,7 @@ const FIXTURES: CreateEvent[] = [
     description: "Paid related instruction plus job placement.",
     emoji: "⚡",
     tags: ["high_school_students", "parents"],
+    ...DEMO_PROVENANCE,
   },
   {
     channel: "automation",
@@ -36,6 +46,7 @@ const FIXTURES: CreateEvent[] = [
     description: "Entry billing roles shrinking; exception handling still hires.",
     emoji: "🤖",
     tags: ["college_students", "career_counselors"],
+    ...DEMO_PROVENANCE,
   },
   {
     channel: "trade",
@@ -43,6 +54,7 @@ const FIXTURES: CreateEvent[] = [
     description: "Heat-pump retrofits need licensed techs this quarter.",
     emoji: "❄️",
     tags: ["parents", "workforce_training_managers"],
+    ...DEMO_PROVENANCE,
   },
 ];
 
@@ -75,6 +87,9 @@ function createMemoryStore(
         id: crypto.randomUUID(),
         ...value,
         created_at: new Date().toISOString(),
+        source: value.source,
+        source_url: value.source_url,
+        fetched_at: value.fetched_at,
       };
       rows.unshift(row);
       return row;
@@ -94,6 +109,7 @@ function createMemoryStore(
       if (existing) {
         existing.value = value.value;
         if (value.detail !== undefined) existing.detail = value.detail;
+        if (value.source !== undefined) existing.source = value.source;
         existing.updated_at = now;
         return { row: { ...existing }, created: false };
       }
@@ -102,6 +118,7 @@ function createMemoryStore(
         title: value.title,
         value: value.value,
         detail: value.detail ?? "",
+        source: value.source ?? "synthetic",
         created_at: now,
         updated_at: now,
       };
@@ -149,12 +166,18 @@ function seedRows(): EventRow[] {
       created_at: new Date(
         Date.UTC(2026, 8, 21 - dayOffset, 8 + (i % 9), (i * 11) % 60, 0)
       ).toISOString(),
+      source: "synthetic",
+      source_url: null,
+      fetched_at: null,
     });
   }
   const fixtures: EventRow[] = FIXTURES.map((value, i) => ({
     id: `11111111-0000-4000-8000-${String(i + 1).padStart(12, "0")}`,
     ...value,
     created_at: new Date(Date.UTC(2026, 8, 21 - (i % 6), 16, i * 5, 0)).toISOString(),
+    source: "synthetic",
+    source_url: null,
+    fetched_at: null,
   }));
   return [...extras, ...fixtures];
 }
@@ -168,6 +191,7 @@ function seedInsights(): InsightRow[] {
     title: value.title,
     value: value.value,
     detail: value.detail ?? "",
+    source: "synthetic",
     created_at: new Date(start).toISOString(),
     updated_at: new Date(start + i * 60_000).toISOString(),
   }));

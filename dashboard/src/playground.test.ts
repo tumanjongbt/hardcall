@@ -24,6 +24,7 @@ test("buildEventPayload omits blank optionals and keeps tags", () => {
       channel: "trade",
       title: "HVAC demand",
       tags: ["parents", "career_counselors"],
+      source: "playground",
     }
   );
   assert.deepEqual(
@@ -40,6 +41,7 @@ test("buildEventPayload omits blank optionals and keeps tags", () => {
       description: "Metro X",
       emoji: "📈",
       tags: ["college_students"],
+      source: "playground",
     }
   );
 });

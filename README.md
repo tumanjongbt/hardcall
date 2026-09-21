@@ -13,6 +13,7 @@ Phase 1 is the always-on ingest API and cloud Postgres store. Scrapers and data 
 | Protostar migration | `migrations/001_events.sql` |
 | Insights migration | `migrations/002_insights.sql` |
 | Insight detail migration | `migrations/003_insights_detail.sql` |
+| Event/insight provenance | `migrations/004_event_provenance.sql` |
 | Orion request validation | `src/events_validate.js`, `src/insights_validate.js` |
 | HTTP contracts | `contracts/POST_api_events.md`, `contracts/GET_api_events.md`, `contracts/GET_api_events_stream.md`, `contracts/POST_api_insight.md`, `contracts/GET_api_insights.md` |
 | TypeScript API | `src/app.ts`, `src/server.ts`, `src/sse_hub.ts` |
@@ -25,15 +26,19 @@ Ingest is **public** this phase (no API key). Treat that as a Phase 1b follow-up
 
 ## Event shape
 
-Required: `channel`, `title`. Optional: `description`, `emoji`, `tags`. Server sets `id` and `created_at`.
+Required: `channel`, `title`. Optional: `description`, `emoji`, `tags`, `source`, `source_url`, `fetched_at`. Server sets `id` and `created_at`. Omitted `source` on an anonymous POST defaults to **`manual`**. Playground sends `playground`; CLI sends `cli`; seed/mock ingest should send `synthetic`.
 
 **Channels:** `university` · `community_college` · `trade` · `apprenticeship` · `automation`
 
 **Stakeholder tags:** `high_school_students` · `college_students` · `parents` · `career_counselors` · `workforce_training_managers`
 
+**Event `source`:** `synthetic` · `manual` · `playground` · `cli` · `bls` · `onet` · `unknown`
+
+`bls` / `onet` are reserved for live adapters (not wired this phase). `source_url` must be `http(s)` if present. `fetched_at` is an optional ISO timestamp.
+
 ## Insight shape
 
-Required: `title`, `value`. Optional: `detail` (analysis body, trim, max 8000). Exact `title` is the upsert key (unique). Server sets `id`, `created_at`, `updated_at`. A later POST with the same title updates `value` and `updated_at`. If `detail` is omitted on update, the stored analysis is kept (not wiped). New titles with no `detail` store `""`.
+Required: `title`, `value`. Optional: `detail` (analysis body, trim, max 8000), `source` (`synthetic` · `manual` · `bls` · `onet` · `unknown`). Exact `title` is the upsert key (unique). Server sets `id`, `created_at`, `updated_at`. A later POST with the same title updates `value` and `updated_at`. If `detail` or `source` is omitted on update, the stored field is kept (not wiped). New titles with no `detail` store `""`; new titles with no `source` store `synthetic`. Existing KPI seeds were backfilled to `synthetic`.
 
 ## `DATABASE_URL` (Neon or Supabase)
 
@@ -71,16 +76,16 @@ npx tsc --noEmit   # optional extra typecheck
 npm run migrate    # applies pending files in migrations/ (001_events, 002_insights, …)
 ```
 
-`schema_migrations` records each file stem (`001_events`, `002_insights`, `003_insights_detail`) so the runner is idempotent. Re-running skips already-applied files. Railway can still run `npm run migrate` on deploy. **Render free-tier does not run a release/pre-deploy migrate** — after merge, Bernard must paste the new SQL in the Supabase SQL editor (same as `002_insights.sql`), then record the stem so a later runner skips it:
+`schema_migrations` records each file stem (`001_events`, `002_insights`, `003_insights_detail`, `004_event_provenance`) so the runner is idempotent. Re-running skips already-applied files. Railway can still run `npm run migrate` on deploy. **Render free-tier does not run a release/pre-deploy migrate** — after merge, Bernard must paste the new SQL in the Supabase SQL editor (same as `002_insights.sql`), then record the stem so a later runner skips it:
 
 ```sql
--- 1. Paste the full contents of migrations/003_insights_detail.sql
+-- 1. Paste the full contents of migrations/004_event_provenance.sql
 -- 2. Then:
-INSERT INTO schema_migrations (id) VALUES ('003_insights_detail')
+INSERT INTO schema_migrations (id) VALUES ('004_event_provenance')
 ON CONFLICT (id) DO NOTHING;
 ```
 
-After that, redeploy the Render web service so the new `detail` field is on `POST /api/insight` and `GET /api/insights`. Then seed analysis bodies (exact titles already in prod):
+After that, redeploy the Render web service so `source` / `source_url` / `fetched_at` are on events and `source` is on insights. Then (optional) re-seed analysis bodies with `source: "synthetic"`:
 
 ```bash
 EVENTS_API_URL=https://hardcall-api.onrender.com node scripts/seed-insight-details.js
@@ -107,7 +112,7 @@ npm run build && npm start
 - `GET /api/events` → `{ "events": [...] }` newest-first (`created_at DESC`, `id DESC`); optional `?channel=` and `?limit=` (default/max 1000)
 - `GET /api/events/stream` → SSE (`text/event-stream`); each new insert is an SSE `message` whose JSON matches the stored row
 - `POST /api/insight` → `201` insert or `200` exact-title upsert; body `{ "title", "value", "detail?" }`; omitted `detail` on update keeps the stored body; `400` / `415` / `500` same posture as events
-- `GET /api/insights` → `{ "insights": [{ id, title, value, detail, created_at, updated_at }] }` ordered by `updated_at DESC`, then `title ASC`
+- `GET /api/insights` → `{ "insights": [{ id, title, value, detail, source, created_at, updated_at }] }` ordered by `updated_at DESC`, then `title ASC`
 
 ```bash
 curl -sS http://127.0.0.1:3000/health
@@ -126,7 +131,8 @@ curl -sS -X POST http://127.0.0.1:3000/api/events \
     "title": "CS starting salaries up in metro X",
     "description": "optional",
     "emoji": "📈",
-    "tags": ["college_students", "parents"]
+    "tags": ["college_students", "parents"],
+    "source": "manual"
   }'
 ```
 
@@ -143,7 +149,7 @@ curl -N https://hardcall-api.onrender.com/api/events/stream
 const es = new EventSource("https://hardcall-api.onrender.com/api/events/stream");
 es.onmessage = (e) => {
   const row = JSON.parse(e.data);
-  console.log(row.id, row.channel, row.title);
+  console.log(row.id, row.channel, row.title, row.source);
 };
 es.onerror = (err) => console.error(err);
 ```
@@ -219,7 +225,7 @@ Render sets `NODE_ENV=production` during install, which omits `devDependencies`.
 2. Build: `npm ci && npm run build`
 3. Start: `npm start`
 4. Environment: `DATABASE_URL` = Neon or Supabase pooler URL.
-5. Release / pre-deploy command: `npm run migrate` (Render **free** often cannot run this — paste new SQL in the Supabase SQL editor instead, same as `002` / `003`)
+5. Release / pre-deploy command: `npm run migrate` (Render **free** often cannot run this — paste new SQL in the Supabase SQL editor instead, same as `002` / `003` / `004`)
 6. Health check path: `/health`
 
 If you prefer to keep compilers in `devDependencies`, override the install with:

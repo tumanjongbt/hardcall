@@ -1,6 +1,14 @@
 import { CHANNELS, CHANNEL_LABELS, channelLabel, tagLabel } from "./channels";
 import { insightDetailBody, insightTone } from "./insights";
 import { highlightFetchHtml } from "./playground";
+import {
+  eventSourceBadge,
+  eventStampKind,
+  insightSourceBadge,
+  pipeProvenanceNote,
+  pipeStatusLabel,
+  type SourceBadge,
+} from "./provenance";
 import type { DashboardTab, EventRow, InsightRow, StreamStatus, ViewState } from "./types";
 
 export type FeedModel = {
@@ -13,6 +21,8 @@ export type FeedModel = {
   status: StreamStatus;
   loadError: string | null;
   loading: boolean;
+  liveCount: number;
+  demoCount: number;
 };
 
 function el<K extends keyof HTMLElementTagNameMap>(
@@ -107,15 +117,22 @@ export function renderPerPage(
   }
 }
 
-export function renderStatus(root: HTMLElement, status: StreamStatus): void {
+export function renderStatus(
+  root: HTMLElement,
+  status: StreamStatus,
+  counts: { live: number; demo: number } = { live: 0, demo: 0 }
+): void {
   root.replaceChildren();
+  const label = pipeStatusLabel(status);
   const pill = el("span", `live-pill live-pill--${status}`);
   const dot = el("span", "live-pill__dot");
-  const label =
-    status === "live" ? "Live" : status === "connecting" ? "Connecting" : "Stream down";
   pill.setAttribute("aria-label", `Stream ${label.toLowerCase()}`);
   pill.append(dot, el("span", undefined, label));
   root.append(pill);
+  const note = pipeProvenanceNote(status, counts.live, counts.demo);
+  if (note) {
+    root.append(el("p", "live-pill__note", note));
+  }
 }
 
 export function renderMeta(
@@ -126,9 +143,13 @@ export function renderMeta(
     ? channelLabel(model.view.channel)
     : "All channels";
   const q = model.view.q ? ` · “${model.view.q}”` : "";
+  const provenance =
+    model.liveCount === 0
+      ? " · feed is demo until live sources exist"
+      : ` · ${model.liveCount} live · ${model.demoCount} demo`;
   root.textContent = model.loading
     ? "Loading feed…"
-    : `${model.total} event${model.total === 1 ? "" : "s"} · ${channel}${q}`;
+    : `${model.total} event${model.total === 1 ? "" : "s"} · ${channel}${q}${provenance}`;
 }
 
 export function renderFeed(root: HTMLElement, model: FeedModel): void {
@@ -161,10 +182,17 @@ function renderCard(event: EventRow, fresh: boolean): HTMLLIElement {
   if (fresh) card.classList.add("is-fresh");
 
   const top = el("div", "event-card__top");
-  const badge = el("span", `channel-badge channel-badge--${event.channel}`, channelLabel(event.channel));
-  const time = el("time", "event-card__time", formatWhen(event.created_at));
-  time.dateTime = event.created_at;
-  top.append(badge, time);
+  const badges = el("div", "event-card__badges");
+  badges.append(
+    el("span", `channel-badge channel-badge--${event.channel}`, channelLabel(event.channel))
+  );
+  badges.append(sourceBadgeEl(eventSourceBadge(event.source)));
+  const stampKind = eventStampKind(event.fetched_at);
+  const stampIso = stampKind === "fetched" && event.fetched_at ? event.fetched_at : event.created_at;
+  const stampLabel = stampKind === "fetched" ? "Fetched" : "Posted";
+  const time = el("time", "event-card__time", `${stampLabel} ${formatWhen(stampIso)}`);
+  time.dateTime = stampIso;
+  top.append(badges, time);
 
   const titleRow = el("div", "event-card__title-row");
   if (event.emoji) titleRow.append(el("span", "event-card__emoji", event.emoji));
@@ -266,6 +294,7 @@ function renderKpiCard(
   const open = openId === insight.id;
   card.setAttribute("aria-expanded", open ? "true" : "false");
   if (open) card.classList.add("is-open");
+  card.append(sourceBadgeEl(insightSourceBadge(insight.source)));
   card.append(el("p", "kpi-card__title", insight.title));
   card.append(el("p", "kpi-card__value", insight.value));
   const time = el("time", "kpi-card__when", `Updated ${formatWhen(insight.updated_at)}`);
@@ -298,10 +327,16 @@ export function renderInsightDetail(
 
   if (sameOpen) {
     const title = root.querySelector("#insight-detail-title");
+    const badge = root.querySelector(".insight-drawer .source-badge");
     const value = root.querySelector(".insight-drawer__value");
     const detail = root.querySelector(".insight-drawer__detail");
     const when = root.querySelector<HTMLTimeElement>(".insight-drawer__when");
     if (title) title.textContent = insight.title;
+    if (badge) {
+      const next = insightSourceBadge(insight.source);
+      badge.className = `source-badge source-badge--${next.kind}`;
+      badge.textContent = next.label;
+    }
     if (value) value.textContent = insight.value;
     if (detail) {
       detail.classList.toggle("is-empty", body.empty);
@@ -334,13 +369,14 @@ export function renderInsightDetail(
 
   const title = el("h2", "insight-drawer__title", insight.title);
   title.id = "insight-detail-title";
+  const badge = sourceBadgeEl(insightSourceBadge(insight.source));
   const value = el("p", "insight-drawer__value", insight.value);
   const when = el("time", "insight-drawer__when", `Updated ${formatWhen(insight.updated_at)}`);
   when.dateTime = insight.updated_at;
   const detail = el("p", "insight-drawer__detail", body.text);
   if (body.empty) detail.classList.add("is-empty");
 
-  drawer.append(close, title, value, when, detail);
+  drawer.append(close, title, badge, value, when, detail);
   backdrop.append(drawer);
   root.append(backdrop);
   close.focus();
@@ -435,6 +471,10 @@ export function renderPlaygroundToast(
 
 export function renderPlaygroundMeta(root: HTMLElement, apiOrigin: string): void {
   root.textContent = `POST ${apiOrigin.replace(/\/+$/, "")}/api/events`;
+}
+
+function sourceBadgeEl(badge: SourceBadge): HTMLSpanElement {
+  return el("span", `source-badge source-badge--${badge.kind}`, badge.label);
 }
 
 export function renderPlaygroundSampleStatus(

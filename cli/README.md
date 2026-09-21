@@ -42,6 +42,8 @@ events push --channel <CHANNEL> --title <TITLE> \
 | `--tags` | `tags` | optional comma-separated list → JSON string array |
 | `--api-url` | — | API **base** URL (no path). Overrides `EVENTS_API_URL` |
 
+The CLI always sends `source: "cli"` so dashboard badges can distinguish CLI rows from Playground, seed, or live adapters.
+
 **Tags:** `high_school_students` · `college_students` · `parents` · `career_counselors` · `workforce_training_managers`
 
 ## API URL

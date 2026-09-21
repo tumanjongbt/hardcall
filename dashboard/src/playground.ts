@@ -52,6 +52,7 @@ export function buildEventPayload(form: PlaygroundForm): Record<string, unknown>
   const emoji = form.emoji.trim();
   if (emoji) payload.emoji = emoji;
   payload.tags = [...form.tags];
+  payload.source = "playground";
   return payload;
 }
 

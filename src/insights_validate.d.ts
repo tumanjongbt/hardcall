@@ -1,4 +1,4 @@
-import type { CreateInsight } from "./types";
+import type { CreateInsight, InsightSource } from "./types";
 
 export type ValidationDetail = {
   field: string;
@@ -6,6 +6,7 @@ export type ValidationDetail = {
 };
 
 export const DETAIL_MAX: number;
+export const INSIGHT_SOURCES: Set<InsightSource>;
 
 export function validateUpsertInsight(
   body: unknown

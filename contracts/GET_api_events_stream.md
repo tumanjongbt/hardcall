@@ -2,6 +2,8 @@
 
 Phase 1.5 — live event stream for listening clients. Neutral path (no `hardcall`). In-memory fan-out on a single API process.
 
+SSE connection status is not the same as data provenance. A connected pipe can still be carrying `synthetic` / `playground` / `cli` rows. `bls` / `onet` appear only after live adapters ship.
+
 ## Request
 
 `Accept: text/event-stream` (optional; the response is SSE regardless).
@@ -21,11 +23,11 @@ retry: 5000
 
 ```
 
-Each newly stored row from `POST /api/events` is broadcast immediately as an SSE `message` whose `data` is the same JSON as the 201 body:
+Each newly stored row from `POST /api/events` is broadcast immediately as an SSE `message` whose `data` is the same JSON as the 201 body (including `source`, `source_url`, `fetched_at`):
 
 ```
 event: message
-data: {"id":"550e8400-e29b-41d4-a716-446655440000","channel":"university","title":"CS starting salaries up in metro X","description":null,"emoji":"📈","tags":["college_students","parents"],"created_at":"2026-09-20T23:56:00.000Z"}
+data: {"id":"550e8400-e29b-41d4-a716-446655440000","channel":"university","title":"CS starting salaries up in metro X","description":null,"emoji":"📈","tags":["college_students","parents"],"created_at":"2026-09-20T23:56:00.000Z","source":"playground","source_url":null,"fetched_at":null}
 
 ```
 

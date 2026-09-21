@@ -16,13 +16,69 @@ const STAKEHOLDER_TAGS = new Set([
   "workforce_training_managers",
 ]);
 
+/** Documented event provenance. Default on omit: `manual` (anonymous POST). */
+const EVENT_SOURCES = new Set([
+  "synthetic",
+  "manual",
+  "playground",
+  "cli",
+  "bls",
+  "onet",
+  "unknown",
+]);
+
+const DEFAULT_EVENT_SOURCE = "manual";
+
 const ALLOWED_KEYS = new Set([
   "channel",
   "title",
   "description",
   "emoji",
   "tags",
+  "source",
+  "source_url",
+  "fetched_at",
 ]);
+
+const ISO_DATETIME =
+  /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})?)?$/;
+
+/**
+ * @param {unknown} value
+ * @returns {{ ok: true, value: string | null } | { ok: false, rule: string }}
+ */
+function parseSourceUrl(value) {
+  if (value === undefined || value === null) return { ok: true, value: null };
+  if (typeof value !== "string") return { ok: false, rule: "http_url" };
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return { ok: true, value: null };
+  if (trimmed.length > 2000) return { ok: false, rule: "length_1_2000" };
+  let url;
+  try {
+    url = new URL(trimmed);
+  } catch {
+    return { ok: false, rule: "http_url" };
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    return { ok: false, rule: "http_url" };
+  }
+  return { ok: true, value: trimmed };
+}
+
+/**
+ * @param {unknown} value
+ * @returns {{ ok: true, value: string | null } | { ok: false, rule: string }}
+ */
+function parseFetchedAt(value) {
+  if (value === undefined || value === null) return { ok: true, value: null };
+  if (typeof value !== "string") return { ok: false, rule: "iso_datetime" };
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return { ok: true, value: null };
+  if (!ISO_DATETIME.test(trimmed)) return { ok: false, rule: "iso_datetime" };
+  const date = new Date(trimmed);
+  if (Number.isNaN(date.getTime())) return { ok: false, rule: "iso_datetime" };
+  return { ok: true, value: date.toISOString() };
+}
 
 /**
  * @param {unknown} body
@@ -109,6 +165,21 @@ function validateCreateEvent(body) {
     }
   }
 
+  let source = DEFAULT_EVENT_SOURCE;
+  if (body.source !== undefined && body.source !== null) {
+    if (typeof body.source !== "string" || !EVENT_SOURCES.has(body.source)) {
+      details.push({ field: "source", rule: "enum" });
+    } else {
+      source = body.source;
+    }
+  }
+
+  const sourceUrl = parseSourceUrl(body.source_url);
+  if (!sourceUrl.ok) details.push({ field: "source_url", rule: sourceUrl.rule });
+
+  const fetchedAt = parseFetchedAt(body.fetched_at);
+  if (!fetchedAt.ok) details.push({ field: "fetched_at", rule: fetchedAt.rule });
+
   if (details.length) return { ok: false, details };
 
   return {
@@ -119,12 +190,17 @@ function validateCreateEvent(body) {
       description,
       emoji,
       tags,
+      source,
+      source_url: sourceUrl.value,
+      fetched_at: fetchedAt.value,
     },
   };
 }
 
 module.exports = {
   CHANNELS,
+  DEFAULT_EVENT_SOURCE,
+  EVENT_SOURCES,
   STAKEHOLDER_TAGS,
   validateCreateEvent,
 };

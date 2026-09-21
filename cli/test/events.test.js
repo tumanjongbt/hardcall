@@ -64,6 +64,9 @@ test("push maps --icon/--tags and prints 201 JSON", async () => {
     emoji: "📈",
     tags: ["college_students", "parents"],
     created_at: "2026-09-20T23:56:00.000Z",
+    source: "cli",
+    source_url: null,
+    fetched_at: null,
   };
   const code = await main(
     [
@@ -96,6 +99,7 @@ test("push maps --icon/--tags and prints 201 JSON", async () => {
     description: "optional",
     emoji: "📈",
     tags: ["college_students", "parents"],
+    source: "cli",
   });
   assert.equal(stdout.out, `${JSON.stringify(row)}\n`);
 });

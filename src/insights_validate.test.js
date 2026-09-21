@@ -23,6 +23,12 @@ const trimmed = ok({
 assert.equal(trimmed.title, "Top Trade Income Growth");
 assert.equal(trimmed.value, "+18%");
 assert.equal(trimmed.detail, undefined);
+assert.equal(trimmed.source, undefined);
+
+assert.equal(
+  ok({ title: "ROI", value: "+6%", source: "synthetic" }).source,
+  "synthetic"
+);
 
 const withDetail = ok({
   title: "Highest Tuition Payload",
@@ -45,6 +51,7 @@ fail({ title: "ROI", value: "+18%", extra: 1 }, "extra", "unknown_key");
 fail({ title: 12, value: "+18%" }, "title", "string");
 fail({ title: "ROI", value: "+18%", detail: 9 }, "detail", "string");
 fail({ title: "ROI", value: "+18%", detail: "x".repeat(8001) }, "detail", "length_0_8000");
+fail({ title: "ROI", value: "+18%", source: "playground" }, "source", "enum");
 fail(null, "_", "object_required");
 
 console.log("insights_validate: ok");

@@ -41,7 +41,7 @@ test("each sample payload is valid for POST /api/events", () => {
     const payload = buildEventPayload(applySample(sample));
     const result = validateCreateEvent(payload);
     assert.equal(result.ok, true, `${sample.id} failed validation: ${JSON.stringify(result)}`);
-    assert.ok(!("source" in payload));
+    assert.equal(payload.source, "playground");
     assert.ok(!("external_id" in payload));
     const snippet = fetchSnippet("https://hardcall-api.onrender.com", payload);
     assert.equal(snippet.includes("Authorization"), false);

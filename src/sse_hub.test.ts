@@ -11,6 +11,9 @@ const row: EventRow = {
   emoji: "📈",
   tags: ["college_students", "parents"],
   created_at: "2026-09-20T23:56:00.000Z",
+  source: "synthetic",
+  source_url: null,
+  fetched_at: null,
 };
 
 test("formatSseMessage is an SSE message with JSON data", () => {

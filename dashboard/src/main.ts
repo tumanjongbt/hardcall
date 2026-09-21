@@ -20,6 +20,7 @@ import {
   resetPlaygroundForm,
   sampleStatusLabel,
 } from "./playgroundSamples";
+import { provenanceCounts } from "./provenance";
 import { filterByLens, filterEvents, paginate } from "./query";
 import {
   renderChannels,
@@ -110,6 +111,7 @@ function currentModel() {
     view = { ...view, page: page.page };
     history.replaceState(view, "", hrefForState(view, location.pathname));
   }
+  const counts = provenanceCounts(allEvents);
   return {
     events: page.items,
     filtered,
@@ -122,6 +124,8 @@ function currentModel() {
     status,
     loadError,
     loading,
+    liveCount: counts.live,
+    demoCount: counts.demo,
   };
 }
 
@@ -156,7 +160,10 @@ function paint(): void {
   perPageBlockEl.hidden = model.view.tab !== "events";
   renderChannels(channelsEl, model.view, setChannel);
   renderPerPage(perPageEl, model.view, setPerPage);
-  renderStatus(statusEl, model.status);
+  renderStatus(statusEl, model.status, {
+    live: model.liveCount,
+    demo: model.demoCount,
+  });
   renderMeta(metaEl, model);
   renderFeed(feedEl, model);
   renderPagination(paginationEl, model, setPage);
@@ -566,5 +573,6 @@ window.setInterval(() => {
 }, INSIGHTS_POLL_MS);
 subscribeEvents(prependLive, (next) => {
   status = next;
-  renderStatus(statusEl, status);
+  const counts = provenanceCounts(allEvents);
+  renderStatus(statusEl, status, counts);
 });
