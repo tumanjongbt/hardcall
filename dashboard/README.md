@@ -12,7 +12,7 @@ npm install
 npm run dev
 ```
 
-Open the Vite URL (default `http://127.0.0.1:5173`). The Events tab reads history from `GET {API}/api/events` and listens on `GET {API}/api/events/stream`. Charts (`?tab=charts`) use that same in-memory store. The Market Insights tab polls `GET {API}/api/insights` on mount and every **15 seconds**. KPI cards are buttons: click (or Enter / Space) opens a side drawer with that tile’s `detail` analysis. Esc or Close returns to the grid. An open drawer stays open across the 15s poll and updates in place if that id is still present. Playground (`?tab=playground`) maps the event contract to a form, highlights the exact native `fetch()` a scraper would run, and Submit posts that JSON to `{API}/api/events`.
+Open the Vite URL (default `http://127.0.0.1:5173`). The Events tab reads history from `GET {API}/api/events` and listens on `GET {API}/api/events/stream`. Charts (`?tab=charts`) use that same in-memory store. The Market Insights tab polls `GET {API}/api/insights` on mount and every **15 seconds**. KPI cards are buttons: click (or Enter / Space) opens a side drawer with that tile’s `detail` analysis. Esc or Close returns to the grid. An open drawer stays open across the 15s poll and updates in place if that id is still present. Playground (`?tab=playground`) maps the event contract to a form, highlights the exact native `fetch()` a scraper would run (Copy copies that snippet), and Submit posts that JSON to `{API}/api/events`. **Fill Sample** cycles five named catalog entries in `src/playgroundSamples.ts` (trade overtime, university tuition, apprenticeship seats, community-college cert, automation risk). **Reset** clears the form, the sample cursor, the error banner, and the success toast.
 
 ```bash
 npm test
@@ -110,6 +110,28 @@ After Bernard pastes `migrations/003_insights_detail.sql` in Supabase, seed anal
 EVENTS_API_URL=https://hardcall-api.onrender.com node scripts/seed-insight-details.js
 ```
 
-8. **Playground tab** — open `?tab=playground`. Change channel, title, description, emoji, and stakeholder checkboxes: the syntax-highlighted `fetch()` block must rewrite on every input (URL `${API}/api/events`, method POST, `Content-Type: application/json`, JSON body matching the form). Submit a valid title: the button disables while in flight, then a toast card shows the new id + title (201/200). Submit an empty title: an inline error banner shows HTTP status + validation message. Double-click Submit should not fire two posts. Switch to Events: the new row should appear (SSE or the playground prepend).
+8. **Playground tab** — open `?tab=playground`.
+   - Change channel, title, description, emoji, and stakeholder tags: the syntax-highlighted `fetch()` block must rewrite on every input (URL `${API}/api/events`, method POST, `Content-Type: application/json` only — no `Authorization` / `apikey`, JSON body matching the form).
+   - **Fill Sample** applies sample 1/5 (Trade overtime) into the left form; the preview updates. Click again to cycle 2/5 University tuition → 3/5 Apprenticeship seats → 4/5 Community college cert → 5/5 Automation risk → wrap. The active label is `Sample N/5: <name>`.
+   - Icon chips set `emoji`; the text field still accepts a custom icon.
+   - **Reset** empties title/description/emoji/tags (channel back to University), clears the sample label, hides the error banner, and dismisses the toast. Preview rewrites to the empty payload.
+   - **Copy** copies the current snippet.
+   - Submit a valid title: the button disables while in flight, then a toast card shows the new id + title (201/200). Submit an empty title: an inline error banner shows HTTP status + validation message. Double-click Submit should not fire two posts. Switch to Events: the new row should appear (SSE or the playground prepend).
+
+Live POST proof (public ingest, no auth headers):
+
+```bash
+curl -sS -D - -X POST https://hardcall-api.onrender.com/api/events \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "channel": "trade",
+    "title": "Electrician overtime wages rise 14% in Q3",
+    "description": "Journeyman electricians in several metro markets are seeing overtime premiums as construction backlogs stretch into fall.",
+    "emoji": "🔧",
+    "tags": ["high_school_students", "workforce_training_managers"]
+  }'
+```
+
+Expect `HTTP/1.1 201` and JSON with `id` + the same title. The playground Submit button fires this same body.
 
 Bulk synthetic records (BLS/O*NET-style demo, no live keys): `prompts/MOCK_INGESTION_SCRIPT_PROMPT.md` — pointer `scripts/mock-ingest-from-prompt.md`.

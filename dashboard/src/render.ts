@@ -406,3 +406,16 @@ export function renderPlaygroundToast(
 export function renderPlaygroundMeta(root: HTMLElement, apiOrigin: string): void {
   root.textContent = `POST ${apiOrigin.replace(/\/+$/, "")}/api/events`;
 }
+
+export function renderPlaygroundSampleStatus(
+  root: HTMLElement,
+  label: string | null
+): void {
+  if (!label) {
+    root.hidden = true;
+    root.textContent = "";
+    return;
+  }
+  root.hidden = false;
+  root.textContent = label;
+}

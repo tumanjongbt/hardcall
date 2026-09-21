@@ -98,13 +98,34 @@
         </div>
         <div class="playground-layout">
           <section class="panel" aria-labelledby="playground-form-title">
-            <h2 id="playground-form-title" class="panel-title">Mock ingest</h2>
+            <div class="panel-head">
+              <h2 id="playground-form-title" class="panel-title">Event payload</h2>
+              <div class="panel-actions">
+                <button
+                  type="button"
+                  id="playground-fill-sample"
+                  class="chip chip--compact"
+                >
+                  Fill Sample
+                </button>
+                <button type="button" id="playground-reset" class="chip chip--compact">
+                  Reset
+                </button>
+              </div>
+            </div>
+            <p
+              id="playground-sample-status"
+              class="sample-status"
+              hidden
+              aria-live="polite"
+            ></p>
             <p class="panel-lede">
-              Build a scraper payload against the live event contract. The fetch
-              preview updates on every keystroke — Submit fires that exact call.
+              Compose a career-event payload, preview the exact <code>fetch()</code>
+              a scraper would fire, and post it at the live API. Fill Sample cycles
+              curated examples; the right pane updates as you type.
             </p>
             <form id="playground-form" class="playground-form" novalidate>
-              <label class="control-label" for="playground-channel">Channel</label>
+              <label class="control-label" for="playground-channel">Channel *</label>
               <select id="playground-channel" class="field" name="channel" required>
                 <option value="university">University</option>
                 <option value="community_college">Community College</option>
@@ -113,7 +134,7 @@
                 <option value="automation">Automation</option>
               </select>
 
-              <label class="control-label" for="playground-title">Title (required)</label>
+              <label class="control-label" for="playground-title">Event title *</label>
               <input
                 id="playground-title"
                 class="field"
@@ -121,7 +142,7 @@
                 type="text"
                 maxlength="200"
                 aria-required="true"
-                placeholder="CS starting salaries up in metro X"
+                placeholder="e.g. Electrician wages rise 14% in Q3"
                 autocomplete="off"
               />
 
@@ -132,10 +153,16 @@
                 name="description"
                 rows="4"
                 maxlength="4000"
-                placeholder="Optional context: wage growth, outlook, education path…"
+                placeholder="Optional longer description of the event…"
               ></textarea>
 
-              <label class="control-label" for="playground-emoji">Emoji / icon</label>
+              <label class="control-label" for="playground-emoji">Icon</label>
+              <div
+                id="playground-emoji-chips"
+                class="chip-row chip-row--emoji"
+                role="group"
+                aria-label="Quick icons"
+              ></div>
               <input
                 id="playground-emoji"
                 class="field"
@@ -144,45 +171,57 @@
                 maxlength="16"
                 placeholder="📈"
                 autocomplete="off"
+                aria-label="Emoji or icon text"
               />
 
               <fieldset class="tag-fieldset">
                 <legend class="control-label">Stakeholder tags</legend>
-                <label class="check">
-                  <input type="checkbox" name="tags" value="high_school_students" />
-                  High school students
-                </label>
-                <label class="check">
-                  <input type="checkbox" name="tags" value="college_students" />
-                  College students
-                </label>
-                <label class="check">
-                  <input type="checkbox" name="tags" value="parents" />
-                  Parents
-                </label>
-                <label class="check">
-                  <input type="checkbox" name="tags" value="career_counselors" />
-                  Career counselors
-                </label>
-                <label class="check">
-                  <input type="checkbox" name="tags" value="workforce_training_managers" />
-                  Workforce training managers
-                </label>
+                <div class="tag-chip-row">
+                  <label class="check check--chip">
+                    <input type="checkbox" name="tags" value="high_school_students" />
+                    High school students
+                  </label>
+                  <label class="check check--chip">
+                    <input type="checkbox" name="tags" value="college_students" />
+                    College students
+                  </label>
+                  <label class="check check--chip">
+                    <input type="checkbox" name="tags" value="parents" />
+                    Parents
+                  </label>
+                  <label class="check check--chip">
+                    <input type="checkbox" name="tags" value="career_counselors" />
+                    Career counselors
+                  </label>
+                  <label class="check check--chip">
+                    <input type="checkbox" name="tags" value="workforce_training_managers" />
+                    Workforce training managers
+                  </label>
+                </div>
               </fieldset>
 
               <div id="playground-error" class="banner banner--error" hidden role="alert"></div>
 
               <button id="playground-submit" class="submit" type="submit">
-                Submit event
+                Submit to API
               </button>
+              <p class="form-hint">Channel and title are required to submit.</p>
             </form>
           </section>
 
           <section class="panel playground-code-panel" aria-labelledby="playground-preview-title">
-            <h2 id="playground-preview-title" class="panel-title">Live fetch()</h2>
+            <div class="panel-head">
+              <h2 id="playground-preview-title" class="panel-title">Generated fetch()</h2>
+              <div class="panel-actions">
+                <button type="button" id="playground-copy" class="chip chip--compact">
+                  Copy
+                </button>
+              </div>
+            </div>
             <p class="panel-lede">
-              Native JavaScript a scraper would run. URL, POST, JSON headers, and
-              body track the form.
+              Exact JavaScript an external scraper would use to push this event.
+              Public ingest — <code>Content-Type</code> only, no bearer tokens.
+              Updates live as you type.
             </p>
             <pre class="code-block" tabindex="0"><code id="playground-fetch" class="language-js"></code></pre>
           </section>
@@ -192,7 +231,8 @@
           Playground posts to <code>POST /api/events</code> at
           <code>VITE_EVENTS_API_URL</code> (default
           <code>https://hardcall-api.onrender.com</code>). Open with
-          <code>?tab=playground</code>. Bulk synthetic records:
+          <code>?tab=playground</code>. Sample catalog:
+          <code>dashboard/src/playgroundSamples.ts</code>. Bulk synthetic records:
           <code>prompts/MOCK_INGESTION_SCRIPT_PROMPT.md</code>.
         </p>
       </div>
