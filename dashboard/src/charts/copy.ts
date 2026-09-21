@@ -3,9 +3,9 @@ import { CHANNEL_LABELS, channelLabel, type Channel } from "../channels";
 export const DECISION_LINE =
   "Which education path is drawing more labor-market signal right now — and is automation pressure rising?";
 
-/** Honest store footnote — charts are not a live BLS/O*NET feed. */
+/** Honest store footnote — charts follow whatever the API returned. */
 export const STORE_FOOTNOTE =
-  "Charts aggregate the event store (demo until live BLS and O*NET adapters ship).";
+  "Charts aggregate the event store. Live badges mark Scorecard, BLS, O*NET, and registered apprenticeship rows from server-side adapters.";
 
 export const EMPTY_COMPARE = "No data for selected paths";
 

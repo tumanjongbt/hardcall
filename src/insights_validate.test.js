@@ -54,6 +54,9 @@ fail({ title: "ROI", value: "+18%", detail: "x".repeat(8001) }, "detail", "lengt
 fail({ title: "ROI", value: "+18%", source: "playground" }, "source", "enum");
 fail({ title: "ROI", value: "+18%", source: "bls" }, "source", "reserved");
 fail({ title: "ROI", value: "+18%", source: "onet" }, "source", "reserved");
+fail({ title: "ROI", value: "+18%", source: "scorecard" }, "source", "reserved");
+fail({ title: "ROI", value: "+18%", source: "apprenticeship_gov" }, "source", "reserved");
+fail({ title: "ROI", value: "+18%", source: "bls_ep" }, "source", "reserved");
 fail(null, "_", "object_required");
 
 console.log("insights_validate: ok");

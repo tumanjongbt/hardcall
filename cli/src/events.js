@@ -86,6 +86,20 @@ async function main(argv, io = {}) {
     return 1;
   }
 
+  const demoFlag = String(env.HARDCALL_ALLOW_DEMO ?? "").trim().toLowerCase();
+  const demoOff =
+    demoFlag === "false" ||
+    demoFlag === "0" ||
+    demoFlag === "off" ||
+    demoFlag === "no" ||
+    (demoFlag === "" && env.NODE_ENV === "production");
+  if (demoOff) {
+    stderr.write(
+      "error: demo ingest is disabled (HARDCALL_ALLOW_DEMO=false). Use the server ingest worker for live feeds.\n"
+    );
+    return 1;
+  }
+
   if (!values.channel || !values.title) {
     stderr.write("error: --channel and --title are required\n");
     return 1;

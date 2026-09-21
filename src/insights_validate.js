@@ -1,21 +1,69 @@
 /** POST /api/insight — boundary validation. Trust DB constraints after parse. */
 
-const ALLOWED_KEYS = new Set(["title", "value", "detail", "source"]);
+const ALLOWED_KEYS = new Set([
+  "title",
+  "value",
+  "detail",
+  "source",
+  "source_url",
+  "fetched_at",
+]);
 const DETAIL_MAX = 8000;
 
-/** Stored / GET enum. `bls` / `onet` stay for future locked ingest. */
+/** Stored / GET enum. Live reserved values are adapter-only. */
 const INSIGHT_SOURCES = new Set([
   "synthetic",
   "manual",
   "bls",
   "onet",
+  "scorecard",
+  "apprenticeship_gov",
+  "bls_ep",
   "unknown",
 ]);
 
 /** Writable on anonymous POST /api/insight (no playground/cli). */
 const PUBLIC_INSIGHT_SOURCES = new Set(["synthetic", "manual", "unknown"]);
 
-const RESERVED_LIVE_SOURCES = new Set(["bls", "onet"]);
+const ISO_DATETIME =
+  /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})?)?$/;
+
+function parseSourceUrl(value) {
+  if (value === undefined || value === null) return { ok: true, value: null };
+  if (typeof value !== "string") return { ok: false, rule: "http_url" };
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return { ok: true, value: null };
+  if (trimmed.length > 2000) return { ok: false, rule: "length_1_2000" };
+  let url;
+  try {
+    url = new URL(trimmed);
+  } catch {
+    return { ok: false, rule: "http_url" };
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    return { ok: false, rule: "http_url" };
+  }
+  return { ok: true, value: trimmed };
+}
+
+function parseFetchedAt(value) {
+  if (value === undefined || value === null) return { ok: true, value: null };
+  if (typeof value !== "string") return { ok: false, rule: "iso_datetime" };
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return { ok: true, value: null };
+  if (!ISO_DATETIME.test(trimmed)) return { ok: false, rule: "iso_datetime" };
+  const date = new Date(trimmed);
+  if (Number.isNaN(date.getTime())) return { ok: false, rule: "iso_datetime" };
+  return { ok: true, value: date.toISOString() };
+}
+
+const RESERVED_LIVE_SOURCES = new Set([
+  "bls",
+  "onet",
+  "scorecard",
+  "apprenticeship_gov",
+  "bls_ep",
+]);
 
 /**
  * @param {unknown} body
@@ -88,12 +136,22 @@ function validateUpsertInsight(body) {
     }
   }
 
+  const sourceUrlProvided = Object.prototype.hasOwnProperty.call(body, "source_url");
+  const sourceUrl = parseSourceUrl(body.source_url);
+  if (!sourceUrl.ok) details.push({ field: "source_url", rule: sourceUrl.rule });
+
+  const fetchedAtProvided = Object.prototype.hasOwnProperty.call(body, "fetched_at");
+  const fetchedAt = parseFetchedAt(body.fetched_at);
+  if (!fetchedAt.ok) details.push({ field: "fetched_at", rule: fetchedAt.rule });
+
   if (details.length) return { ok: false, details };
 
-  /** @type {{ title: string, value: string, detail?: string, source?: string }} */
+  /** @type {{ title: string, value: string, detail?: string, source?: string, source_url?: string | null, fetched_at?: string | null }} */
   const parsed = { title, value };
   if (detailProvided) parsed.detail = detail;
   if (sourceProvided) parsed.source = source;
+  if (sourceUrlProvided) parsed.source_url = sourceUrl.value;
+  if (fetchedAtProvided) parsed.fetched_at = fetchedAt.value;
 
   return { ok: true, value: parsed };
 }

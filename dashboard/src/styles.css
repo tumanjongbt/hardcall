@@ -1506,3 +1506,35 @@ select.field {
   color: var(--signal);
   font-weight: 650;
 }
+
+.event-card__source,
+.insight-drawer__source {
+  display: inline-block;
+  margin-top: 10px;
+  color: var(--signal);
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+}
+
+.site-footer {
+  margin-top: 40px;
+  padding: 24px 4px 40px;
+  border-top: 1px solid var(--line);
+  color: var(--mute);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.site-footer p {
+  margin: 0 0 8px;
+}
+
+.site-footer__credit {
+  max-width: 72rem;
+}
+
+.site-footer__mode,
+.site-footer__asof {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}

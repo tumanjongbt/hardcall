@@ -16,7 +16,7 @@ const STAKEHOLDER_TAGS = new Set([
   "workforce_training_managers",
 ]);
 
-/** Stored / GET enum. `bls` / `onet` stay for future locked ingest. */
+/** Stored / GET enum. Live reserved values are adapter-only. */
 const EVENT_SOURCES = new Set([
   "synthetic",
   "manual",
@@ -24,6 +24,9 @@ const EVENT_SOURCES = new Set([
   "cli",
   "bls",
   "onet",
+  "scorecard",
+  "apprenticeship_gov",
+  "bls_ep",
   "unknown",
 ]);
 
@@ -36,7 +39,13 @@ const PUBLIC_EVENT_SOURCES = new Set([
   "unknown",
 ]);
 
-const RESERVED_LIVE_SOURCES = new Set(["bls", "onet"]);
+const RESERVED_LIVE_SOURCES = new Set([
+  "bls",
+  "onet",
+  "scorecard",
+  "apprenticeship_gov",
+  "bls_ep",
+]);
 
 const DEFAULT_EVENT_SOURCE = "manual";
 

@@ -15,6 +15,10 @@ Phase 1 is the always-on ingest API and cloud Postgres store. Scrapers and data 
 | Insight detail migration | `migrations/003_insights_detail.sql` |
 | Event/insight provenance | `migrations/004_event_provenance.sql` |
 | Live-source integrity | `migrations/005_live_source_integrity.sql` |
+| Domain warehouse + live enums | `migrations/006_domain_warehouse.sql` |
+| Keyless ingest worker | `src/ingest/` (`npm run ingest`) |
+| Deploy checklist | `docs/DEPLOY.md` |
+| Authoritative sources | `docs/AUTHORITATIVE_SOURCES.md` |
 | Orion request validation | `src/events_validate.js`, `src/insights_validate.js` |
 | HTTP contracts | `contracts/POST_api_events.md`, `contracts/GET_api_events.md`, `contracts/GET_api_events_stream.md`, `contracts/POST_api_insight.md`, `contracts/GET_api_insights.md` |
 | TypeScript API | `src/app.ts`, `src/server.ts`, `src/sse_hub.ts` |
@@ -33,13 +37,13 @@ Required: `channel`, `title`. Optional: `description`, `emoji`, `tags`, `source`
 
 **Stakeholder tags:** `high_school_students` · `college_students` · `parents` · `career_counselors` · `workforce_training_managers`
 
-**Event `source`:** `synthetic` · `manual` · `playground` · `cli` · `bls` · `onet` · `unknown`
+**Event `source`:** `synthetic` · `manual` · `playground` · `cli` · `bls` · `onet` · `scorecard` · `apprenticeship_gov` · `bls_ep` · `unknown`
 
-`bls` / `onet` stay in the stored enum for future locked ingest (Supernova). **Anonymous public POST cannot set them** (`400` `source` / `reserved`). Allowed on public POST: `synthetic` · `manual` · `playground` · `cli` · `unknown`. `source_url` must be `http(s)` if present. `fetched_at` is an optional ISO timestamp. Live `bls`/`onet` event rows (future ingest) also need both `source_url` and `fetched_at` (Protostar CHECK).
+Reserved live sources (`bls` / `onet` / `scorecard` / `apprenticeship_gov` / `bls_ep`) stay in the stored enum for **server-side ingest only**. **Anonymous public POST cannot set them** (`400` `source` / `reserved`). Allowed on public POST: `synthetic` · `manual` · `playground` · `cli` · `unknown`. When `HARDCALL_ALLOW_DEMO=false` (production default), `synthetic` / `playground` / `cli` writes are **`403` `demo_disabled`**. `source_url` must be `http(s)` if present. `fetched_at` is an optional ISO timestamp. Live reserved event rows need both `source_url` and `fetched_at` (Protostar CHECK).
 
 ## Insight shape
 
-Required: `title`, `value`. Optional: `detail` (analysis body, trim, max 8000), `source`. Anonymous public POST may send only `synthetic` · `manual` · `unknown`. `bls` / `onet` stay in the stored enum for future locked ingest — **anonymous clients cannot set them** (`400` `source` / `reserved`). Exact `title` is the upsert key (unique). Server sets `id`, `created_at`, `updated_at`. A later POST with the same title updates `value` and `updated_at`. If `detail` or `source` is omitted on update, the stored field is kept (not wiped). New titles with no `detail` store `""`; new titles with no `source` store `synthetic`. Existing KPI seeds were backfilled to `synthetic`.
+Required: `title`, `value`. Optional: `detail` (analysis body, trim, max 8000), `source`, `source_url`, `fetched_at`. Anonymous public POST may send only `synthetic` · `manual` · `unknown`. Reserved live sources stay in the stored enum — **anonymous clients cannot set them** (`400` `source` / `reserved`). When demo is off, `source: synthetic` (including omitted source, which inserts as synthetic) is **`403` `demo_disabled`**. Exact `title` is the upsert key (unique). Server sets `id`, `created_at`, `updated_at`. Live reserved insight rows also need `source_url` and `fetched_at`.
 
 ## `DATABASE_URL` (Neon or Supabase)
 
@@ -77,7 +81,16 @@ npx tsc --noEmit   # optional extra typecheck
 npm run migrate    # applies pending files in migrations/ (001_events, 002_insights, …)
 ```
 
-`schema_migrations` records each file stem (`001_events`, `002_insights`, `003_insights_detail`, `004_event_provenance`, `005_live_source_integrity`) so the runner is idempotent. Re-running skips already-applied files. Railway can still run `npm run migrate` on deploy. **Render free-tier does not run a release/pre-deploy migrate** — after merge, Bernard must paste the new SQL in the Supabase SQL editor (same as `002_insights.sql`), then record the stem so a later runner skips it:
+`schema_migrations` records each file stem (`001_events` … `006_domain_warehouse`) so the runner is idempotent. Re-running skips already-applied files. Railway can still run `npm run migrate` on deploy. **Render free-tier does not run a release/pre-deploy migrate** — after merge, Bernard must paste the new SQL in the Supabase SQL editor, then record the stem so a later runner skips it:
+
+```sql
+-- 1. Paste the full contents of migrations/006_domain_warehouse.sql
+-- 2. Then:
+INSERT INTO schema_migrations (id) VALUES ('006_domain_warehouse')
+ON CONFLICT (id) DO NOTHING;
+```
+
+See `docs/DEPLOY.md` for the production flip checklist (`HARDCALL_ALLOW_DEMO=false`, ingest cron, spoof/403 probes).
 
 ```sql
 -- 1. Paste the full contents of migrations/005_live_source_integrity.sql
@@ -120,6 +133,28 @@ The migration creates `events` plus:
 
 Empty titles and empty-string optionals are illegal in the table. The API trims and turns blank `description` / `emoji` into `null` before insert.
 
+## Live ingest (keyless)
+
+Official bulk feeds — no API keys. The worker writes warehouse tables, then upserts Events/Insights **derived from those rows only**.
+
+```bash
+npm run build
+npm run ingest -- --source apprenticeship_gov --dry-run
+npm run ingest -- --source all
+# or a local file:
+npx tsx src/ingest/cli.ts --source scorecard --file fixtures/scorecard_institutions_sample.csv --dry-run
+```
+
+| `--source` | Feed |
+| --- | --- |
+| `apprenticeship_gov` | DOL OA Partner Sponsors CSV |
+| `scorecard` | College Scorecard most-recent institution + field-of-study zips |
+| `onet` | O*NET Occupation Data CSV |
+| `bls` | OEWS Table 1 / national tables |
+| `all` | the four above |
+
+`--dry-run` parses and prints counts without `DATABASE_URL`. Production cron: `node dist/ingest/cli.js --source all` with `HARDCALL_ALLOW_DEMO=false`.
+
 ## Run
 
 ```bash
@@ -129,6 +164,7 @@ npm run build && npm start
 ```
 
 - `GET /health` → `{ "ok": true }`
+- `GET /api/meta` → `{ "ok", "allow_demo", "live_sources", "warehouse" }`
 - `POST /api/events` → `201` + stored row, or `400` / `415` / `500` per the contract
 - `GET /api/events` → `{ "events": [...] }` newest-first (`created_at DESC`, `id DESC`); optional `?channel=` and `?limit=` (default/max 1000)
 - `GET /api/events/stream` → SSE (`text/event-stream`); each new insert is an SSE `message` whose JSON matches the stored row
@@ -245,9 +281,10 @@ Render sets `NODE_ENV=production` during install, which omits `devDependencies`.
 1. New Web Service from this GitHub repo.
 2. Build: `npm ci && npm run build`
 3. Start: `npm start`
-4. Environment: `DATABASE_URL` = Neon or Supabase pooler URL.
-5. Release / pre-deploy command: `npm run migrate` (Render **free** often cannot run this — paste new SQL in the Supabase SQL editor instead, same as `002` / `003` / `004` / `005`)
+4. Environment: `DATABASE_URL` = Neon or Supabase pooler URL. **Production:** `HARDCALL_ALLOW_DEMO=false`.
+5. Release / pre-deploy command: `npm run migrate` (Render **free** often cannot run this — paste new SQL in the Supabase SQL editor instead, same as `002` / `003` / `004` / `005` / `006`)
 6. Health check path: `/health`
+7. Add a **cron** service: `node dist/ingest/cli.js --source all` (see `docs/DEPLOY.md` and `render.yaml`)
 
 If you prefer to keep compilers in `devDependencies`, override the install with:
 

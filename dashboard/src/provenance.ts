@@ -1,6 +1,12 @@
 import type { StreamStatus } from "./types";
 
-export const LIVE_EVENT_SOURCES = new Set(["bls", "onet"]);
+export const LIVE_EVENT_SOURCES = new Set([
+  "bls",
+  "onet",
+  "scorecard",
+  "apprenticeship_gov",
+  "bls_ep",
+]);
 
 export type BadgeKind = "live" | "demo";
 
@@ -16,6 +22,9 @@ const EVENT_SOURCE_BADGES: Record<string, SourceBadge> = {
   manual: { label: "Manual", kind: "demo" },
   bls: { label: "Live · BLS", kind: "live" },
   onet: { label: "Live · O*NET", kind: "live" },
+  scorecard: { label: "Live · Scorecard", kind: "live" },
+  apprenticeship_gov: { label: "Live · Apprenticeship", kind: "live" },
+  bls_ep: { label: "Live · BLS EP", kind: "live" },
   unknown: { label: "Unknown", kind: "demo" },
 };
 
@@ -33,7 +42,10 @@ export function eventSourceBadge(value: unknown): SourceBadge {
 
 export function insightSourceBadge(value: unknown): SourceBadge {
   if (value === "bls") return { label: "Live · BLS", kind: "live" };
+  if (value === "bls_ep") return { label: "Live · BLS EP", kind: "live" };
   if (value === "onet") return { label: "Live · O*NET", kind: "live" };
+  if (value === "scorecard") return { label: "Live · Scorecard", kind: "live" };
+  if (value === "apprenticeship_gov") return { label: "Live · Apprenticeship", kind: "live" };
   if (value === "manual") return { label: "Manual", kind: "demo" };
   if (value === "unknown") return { label: "Unknown", kind: "demo" };
   return { label: "Demo KPI", kind: "demo" };
@@ -63,10 +75,15 @@ export function pipeProvenanceNote(
   demo: number
 ): string | null {
   if (status !== "live") return null;
-  if (live === 0) return "SSE live · feed is mostly demo until adapters ship";
+  if (live === 0 && demo === 0) return "SSE live · waiting for ingest";
+  if (live === 0) return "SSE live · no live-source rows in this feed";
+  if (demo === 0) return `${live} live`;
   return `${live} live · ${demo} demo`;
 }
 
 export function eventStampKind(fetchedAt: string | null | undefined): "fetched" | "posted" {
   return fetchedAt ? "fetched" : "posted";
 }
+
+export const ATTRIBUTION =
+  "Data: U.S. Department of Education College Scorecard · U.S. Bureau of Labor Statistics OEWS · O*NET Database by USDOL/ETA (CC BY 4.0; O*NET® is a trademark of USDOL/ETA) · U.S. Department of Labor registered apprenticeship partner sponsors. Live badges are server-side adapters only.";

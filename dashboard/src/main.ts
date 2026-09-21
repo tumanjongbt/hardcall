@@ -1,4 +1,4 @@
-import { fetchEvents, fetchInsights, postEvent, postInsight, subscribeEvents } from "./api";
+import { fetchEvents, fetchInsights, fetchMeta, postEvent, postInsight, subscribeEvents } from "./api";
 import { DECISION_LINE } from "./charts/copy";
 import { renderCharts, teardownCharts } from "./charts/renderCharts";
 import { renderChartFilters } from "./charts/controls";
@@ -39,6 +39,7 @@ import {
   renderStatus,
   renderTabs,
   renderAdminStatus,
+  renderAttribution,
 } from "./render";
 import {
   emptySeedProgress,
@@ -93,6 +94,7 @@ const adminFileEl = must<HTMLInputElement>("#admin-file");
 const adminChooseEl = must<HTMLButtonElement>("#admin-choose");
 const adminStatusEl = must("#admin-status");
 const adminToastEl = must("#admin-toast");
+const attributionEl = must("#attribution");
 
 let allEvents: EventRow[] = [];
 let insights: InsightRow[] = [];
@@ -112,6 +114,8 @@ let playgroundSampleIndex: number | null = null;
 let playgroundCopyTimer: number | null = null;
 let seedProgress: SeedProgress = emptySeedProgress();
 let adminToastTimer: number | null = null;
+let allowDemo = import.meta.env.VITE_HARDCALL_ALLOW_DEMO !== "false";
+let warehouseFetchedAt: string | null = null;
 
 function must<T extends HTMLElement = HTMLElement>(selector: string): T {
   const node = document.querySelector<T>(selector);
@@ -156,8 +160,15 @@ function insightsModel() {
 }
 
 function paint(): void {
+  if (
+    !allowDemo &&
+    (view.tab === "playground" || view.tab === "admin")
+  ) {
+    view = { ...view, tab: "events" };
+    history.replaceState(view, "", hrefForState(view, location.pathname));
+  }
   const model = currentModel();
-  renderTabs(tabsEl, model.view.tab, setTab);
+  renderTabs(tabsEl, model.view.tab, setTab, { allowDemo });
   eventsViewEl.hidden = model.view.tab !== "events";
   chartsViewEl.hidden = model.view.tab !== "charts";
   chartsHeadingEl.hidden = model.view.tab !== "charts";
@@ -226,6 +237,10 @@ function paint(): void {
   );
   if (model.view.tab === "playground") paintPlayground();
   if (model.view.tab === "admin") paintAdmin();
+  renderAttribution(attributionEl, {
+    allowDemo,
+    fetchedAt: warehouseFetchedAt,
+  });
   if (searchEl.value !== model.view.q && document.activeElement !== searchEl) {
     searchEl.value = model.view.q;
   }
@@ -238,6 +253,7 @@ function pushView(next: ViewState): void {
 }
 
 function setTab(tab: DashboardTab): void {
+  if (!allowDemo && (tab === "playground" || tab === "admin")) return;
   if (view.tab === tab) return;
   pushView({ ...view, tab, insight: tab === "insights" ? view.insight : null });
 }
@@ -699,11 +715,23 @@ async function loadInsights(): Promise<void> {
   }
 }
 
+async function loadMeta(): Promise<void> {
+  try {
+    const meta = await fetchMeta();
+    allowDemo = meta.allow_demo;
+    warehouseFetchedAt = meta.warehouse?.latest_fetched_at ?? null;
+  } catch {
+    // Keep the Vite default; paint still works if /api/meta is not deployed yet.
+  }
+  paint();
+}
+
 searchEl.value = view.q;
 history.replaceState(view, "", hrefForState(view, location.pathname));
 mountEmojiChips();
 writePlaygroundForm(resetPlaygroundForm());
 paint();
+void loadMeta();
 void loadHistory();
 void loadInsights();
 window.setInterval(() => {

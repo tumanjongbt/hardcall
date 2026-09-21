@@ -23,6 +23,8 @@ GET /api/insights
       "value": "+18%",
       "detail": "Licensed electricians and HVAC techs still outpace degree-only paths.\nKeep a waitlist for night cohorts.",
       "source": "synthetic",
+      "source_url": null,
+      "fetched_at": null,
       "created_at": "2026-09-21T00:00:00.000Z",
       "updated_at": "2026-09-21T00:15:00.000Z"
     }
@@ -30,7 +32,7 @@ GET /api/insights
 }
 ```
 
-`detail` is always a string (empty when no analysis has been stored). `source` is one of: `synthetic` \| `manual` \| `bls` \| `onet` \| `unknown`. Existing KPI seeds were backfilled to `synthetic`. `bls` / `onet` remain reserved until locked ingest auth — anonymous `POST /api/insight` cannot mint them. Order is **`updated_at DESC`**, then **`title ASC`** (most recently refreshed KPI first).
+`detail` is always a string (empty when no analysis has been stored). `source` is one of: `synthetic` \| `manual` \| `bls` \| `onet` \| `scorecard` \| `apprenticeship_gov` \| `bls_ep` \| `unknown`. `source_url` / `fetched_at` are null unless the row was written by ingest. Reserved live sources are adapter-only. When demo is off, `synthetic` KPIs are omitted from this list. Order is **`updated_at DESC`**, then **`title ASC`**.
 
 **500** persist failure (no leak of internals)
 

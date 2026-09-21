@@ -1,6 +1,12 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import { CHANNELS, validateCreateEvent } from "./events_validate";
 import { validateUpsertInsight } from "./insights_validate";
+import {
+  DEMO_DISABLED_ERROR,
+  isDemoEventSource,
+  isDemoInsightSource,
+} from "./demo_gate";
+import { EMPTY_WAREHOUSE_STATS, type Warehouse } from "./ingest/warehouse";
 import { createSseHub, type SseHub } from "./sse_hub";
 import type { ListEventsQuery, Store } from "./types";
 
@@ -73,7 +79,13 @@ export function parseListQuery(
 
 export function createApp(
   store: Store,
-  opts?: { logger?: boolean; hub?: SseHub; heartbeatMs?: number }
+  opts?: {
+    logger?: boolean;
+    hub?: SseHub;
+    heartbeatMs?: number;
+    allowDemo?: boolean;
+    warehouse?: Warehouse;
+  }
 ): FastifyInstance {
   const app = Fastify({
     logger: opts?.logger ?? false,
@@ -82,6 +94,7 @@ export function createApp(
   });
   const hub = opts?.hub ?? createSseHub();
   const heartbeatMs = opts?.heartbeatMs ?? SSE_HEARTBEAT_MS;
+  const allowDemo = opts?.allowDemo !== false;
 
   app.setErrorHandler((err, _request, reply) => {
     if (isParserError(err)) {
@@ -101,6 +114,23 @@ export function createApp(
 
   app.get("/health", async () => ({ ok: true }));
 
+  app.get("/api/meta", async (request, reply) => {
+    let warehouse = EMPTY_WAREHOUSE_STATS;
+    if (opts?.warehouse) {
+      try {
+        warehouse = await opts.warehouse.stats();
+      } catch (err) {
+        request.log.error(err);
+      }
+    }
+    return reply.send({
+      ok: true,
+      allow_demo: allowDemo,
+      live_sources: ["bls", "onet", "scorecard", "apprenticeship_gov", "bls_ep"],
+      warehouse,
+    });
+  });
+
   app.get("/api/events", async (request, reply) => {
     const parsed = parseListQuery(request.query);
     if (!parsed.ok) {
@@ -111,7 +141,10 @@ export function createApp(
     }
 
     try {
-      const events = await store.listEvents(parsed.value);
+      const events = await store.listEvents({
+        ...parsed.value,
+        includeDemo: allowDemo,
+      });
       return reply.send({ events });
     } catch (err) {
       request.log.error(err);
@@ -166,6 +199,10 @@ export function createApp(
       });
     }
 
+    if (!allowDemo && isDemoEventSource(parsed.value.source)) {
+      return reply.code(403).send({ error: DEMO_DISABLED_ERROR });
+    }
+
     try {
       const row = await store.insertEvent(parsed.value);
       hub.broadcast(row);
@@ -178,7 +215,7 @@ export function createApp(
 
   app.get("/api/insights", async (request, reply) => {
     try {
-      const insights = await store.listInsights();
+      const insights = await store.listInsights({ includeDemo: allowDemo });
       return reply.send({ insights });
     } catch (err) {
       request.log.error(err);
@@ -197,6 +234,11 @@ export function createApp(
         error: "validation_failed",
         details: parsed.details,
       });
+    }
+
+    const insightSource = parsed.value.source ?? "synthetic";
+    if (!allowDemo && isDemoInsightSource(insightSource)) {
+      return reply.code(403).send({ error: DEMO_DISABLED_ERROR });
     }
 
     try {

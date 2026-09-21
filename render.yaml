@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: hardcall-api
+    runtime: node
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HARDCALL_ALLOW_DEMO
+        value: "false"
+      - key: DATABASE_URL
+        sync: false
+
+  - type: cron
+    name: hardcall-ingest
+    runtime: node
+    buildCommand: npm ci && npm run build
+    startCommand: node dist/ingest/cli.js --source all
+    schedule: "0 6 * * *"
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HARDCALL_ALLOW_DEMO
+        value: "false"
+      - key: DATABASE_URL
+        sync: false

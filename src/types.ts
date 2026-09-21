@@ -5,9 +5,20 @@ export type EventSource =
   | "cli"
   | "bls"
   | "onet"
+  | "scorecard"
+  | "apprenticeship_gov"
+  | "bls_ep"
   | "unknown";
 
-export type InsightSource = "synthetic" | "manual" | "bls" | "onet" | "unknown";
+export type InsightSource =
+  | "synthetic"
+  | "manual"
+  | "bls"
+  | "onet"
+  | "scorecard"
+  | "apprenticeship_gov"
+  | "bls_ep"
+  | "unknown";
 
 export type CreateEvent = {
   channel: string;
@@ -38,6 +49,7 @@ export type EventRow = {
 export type ListEventsQuery = {
   limit: number;
   channel?: string;
+  includeDemo?: boolean;
 };
 
 export type EventStore = {
@@ -52,6 +64,8 @@ export type CreateInsight = {
   detail?: string;
   /** Present only when the client sent `source` (omitted on update keeps the stored source). */
   source?: InsightSource;
+  source_url?: string | null;
+  fetched_at?: string | null;
 };
 
 export type InsightRow = {
@@ -60,13 +74,15 @@ export type InsightRow = {
   value: string;
   detail: string;
   source: InsightSource;
+  source_url: string | null;
+  fetched_at: string | null;
   created_at: string;
   updated_at: string;
 };
 
 export type InsightStore = {
   upsertInsight(value: CreateInsight): Promise<{ row: InsightRow; created: boolean }>;
-  listInsights(): Promise<InsightRow[]>;
+  listInsights(query?: { includeDemo?: boolean }): Promise<InsightRow[]>;
 };
 
 export type Store = EventStore & InsightStore;

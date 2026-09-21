@@ -65,6 +65,19 @@ const SEEDS = {
 };
 
 async function main() {
+  const demoFlag = String(process.env.HARDCALL_ALLOW_DEMO ?? "").trim().toLowerCase();
+  const demoOff =
+    demoFlag === "false" ||
+    demoFlag === "0" ||
+    demoFlag === "off" ||
+    demoFlag === "no" ||
+    (demoFlag === "" && process.env.NODE_ENV === "production");
+  if (demoOff) {
+    console.error(
+      "Refusing synthetic KPI seed: HARDCALL_ALLOW_DEMO is off. Use npm run ingest for live Scorecard/BLS/O*NET/apprenticeship rows."
+    );
+    process.exit(1);
+  }
   const res = await fetch(`${API}/api/insights`);
   if (!res.ok) {
     throw new Error(`GET /api/insights failed: HTTP ${res.status}`);
