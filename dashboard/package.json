@@ -8,11 +8,14 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "test": "tsx --test src/*.test.ts"
+    "test": "tsx --test src/*.test.ts src/charts/*.test.ts"
   },
   "devDependencies": {
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",
     "vite": "^7.1.5"
+  },
+  "dependencies": {
+    "chart.js": "^4.5.1"
   }
 }

@@ -3,6 +3,7 @@ import { INSIGHTS_POLL_MS, SEARCH_DEBOUNCE_MS } from "./config";
 import { debounce } from "./debounce";
 import { filterEvents, paginate } from "./query";
 import { findInsight } from "./insights";
+import { renderCharts, teardownCharts } from "./charts/renderCharts";
 import {
   renderChannels,
   renderFeed,
@@ -20,7 +21,11 @@ import { hrefForState, parseViewState } from "./url-state";
 
 const tabsEl = must("#tabs");
 const eventsViewEl = must("#events-view");
+const chartsViewEl = must("#charts-view");
+const chartsEl = must("#charts");
 const insightsViewEl = must("#insights-view");
+const eventFiltersEl = must("#event-filters");
+const perPageBlockEl = must("#per-page-block");
 const channelsEl = must("#channel-filters");
 const perPageEl = must("#per-page");
 const searchEl = must<HTMLInputElement>("#search");
@@ -58,6 +63,7 @@ function currentModel() {
   }
   return {
     events: page.items,
+    filtered,
     freshIds,
     total: page.total,
     page: page.page,
@@ -83,13 +89,26 @@ function paint(): void {
   const model = currentModel();
   renderTabs(tabsEl, model.view.tab, setTab);
   eventsViewEl.hidden = model.view.tab !== "events";
+  chartsViewEl.hidden = model.view.tab !== "charts";
   insightsViewEl.hidden = model.view.tab !== "insights";
+  eventFiltersEl.hidden = model.view.tab === "insights";
+  perPageBlockEl.hidden = model.view.tab !== "events";
   renderChannels(channelsEl, model.view, setChannel);
   renderPerPage(perPageEl, model.view, setPerPage);
   renderStatus(statusEl, model.status);
   renderMeta(metaEl, model);
   renderFeed(feedEl, model);
   renderPagination(paginationEl, model, setPage);
+  if (model.view.tab === "charts") {
+    renderCharts(chartsEl, {
+      events: model.filtered,
+      view: model.view,
+      loading: model.loading,
+      loadError: model.loadError,
+    });
+  } else {
+    teardownCharts(chartsEl);
+  }
   renderInsights(insightsEl, insightsModel(), toggleInsight);
   renderInsightsMeta(insightsMetaEl, insightsModel());
   renderInsightDetail(
