@@ -42,7 +42,7 @@ GET /api/events?channel=trade&limit=200
 }
 ```
 
-`source` is one of: `synthetic` \| `manual` \| `playground` \| `cli` \| `bls` \| `onet` \| `unknown`. Existing seed/mock rows were backfilled to `synthetic`. `bls` / `onet` appear only after live adapters ship.
+`source` is one of: `synthetic` \| `manual` \| `playground` \| `cli` \| `bls` \| `onet` \| `unknown`. Existing seed/mock rows were backfilled to `synthetic`. `bls` / `onet` remain reserved until locked ingest auth — anonymous `POST /api/events` cannot mint them.
 
 Order is `created_at DESC`, then `id DESC`. There is no `q` parameter — clients search title, description, and tags on the returned set.
 

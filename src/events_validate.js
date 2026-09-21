@@ -16,7 +16,7 @@ const STAKEHOLDER_TAGS = new Set([
   "workforce_training_managers",
 ]);
 
-/** Documented event provenance. Default on omit: `manual` (anonymous POST). */
+/** Stored / GET enum. `bls` / `onet` stay for future locked ingest. */
 const EVENT_SOURCES = new Set([
   "synthetic",
   "manual",
@@ -26,6 +26,17 @@ const EVENT_SOURCES = new Set([
   "onet",
   "unknown",
 ]);
+
+/** Writable on anonymous POST /api/events. */
+const PUBLIC_EVENT_SOURCES = new Set([
+  "synthetic",
+  "manual",
+  "playground",
+  "cli",
+  "unknown",
+]);
+
+const RESERVED_LIVE_SOURCES = new Set(["bls", "onet"]);
 
 const DEFAULT_EVENT_SOURCE = "manual";
 
@@ -167,7 +178,11 @@ function validateCreateEvent(body) {
 
   let source = DEFAULT_EVENT_SOURCE;
   if (body.source !== undefined && body.source !== null) {
-    if (typeof body.source !== "string" || !EVENT_SOURCES.has(body.source)) {
+    if (typeof body.source !== "string") {
+      details.push({ field: "source", rule: "enum" });
+    } else if (RESERVED_LIVE_SOURCES.has(body.source)) {
+      details.push({ field: "source", rule: "reserved" });
+    } else if (!PUBLIC_EVENT_SOURCES.has(body.source)) {
       details.push({ field: "source", rule: "enum" });
     } else {
       source = body.source;
@@ -201,6 +216,8 @@ module.exports = {
   CHANNELS,
   DEFAULT_EVENT_SOURCE,
   EVENT_SOURCES,
+  PUBLIC_EVENT_SOURCES,
+  RESERVED_LIVE_SOURCES,
   STAKEHOLDER_TAGS,
   validateCreateEvent,
 };

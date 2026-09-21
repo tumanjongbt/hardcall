@@ -1,4 +1,4 @@
--- Provenance for events and insights. Neutral DDL (no hardcall identifiers).
+-- Provenance for events and insights. Neutral DDL (no product identifiers).
 -- Allowed event source: synthetic | manual | playground | cli | bls | onet | unknown
 -- Allowed insight source: synthetic | manual | bls | onet | unknown
 -- Existing rows are mock/playground/seed — backfill to synthetic. Do not invent bls/onet.

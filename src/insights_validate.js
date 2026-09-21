@@ -3,7 +3,7 @@
 const ALLOWED_KEYS = new Set(["title", "value", "detail", "source"]);
 const DETAIL_MAX = 8000;
 
-/** Documented insight provenance. Smaller set than events (no playground/cli). */
+/** Stored / GET enum. `bls` / `onet` stay for future locked ingest. */
 const INSIGHT_SOURCES = new Set([
   "synthetic",
   "manual",
@@ -11,6 +11,11 @@ const INSIGHT_SOURCES = new Set([
   "onet",
   "unknown",
 ]);
+
+/** Writable on anonymous POST /api/insight (no playground/cli). */
+const PUBLIC_INSIGHT_SOURCES = new Set(["synthetic", "manual", "unknown"]);
+
+const RESERVED_LIVE_SOURCES = new Set(["bls", "onet"]);
 
 /**
  * @param {unknown} body
@@ -72,7 +77,11 @@ function validateUpsertInsight(body) {
   let source;
   if (sourceProvided) {
     const raw = body.source;
-    if (typeof raw !== "string" || !INSIGHT_SOURCES.has(raw)) {
+    if (typeof raw !== "string") {
+      details.push({ field: "source", rule: "enum" });
+    } else if (RESERVED_LIVE_SOURCES.has(raw)) {
+      details.push({ field: "source", rule: "reserved" });
+    } else if (!PUBLIC_INSIGHT_SOURCES.has(raw)) {
       details.push({ field: "source", rule: "enum" });
     } else {
       source = raw;
@@ -92,5 +101,7 @@ function validateUpsertInsight(body) {
 module.exports = {
   DETAIL_MAX,
   INSIGHT_SOURCES,
+  PUBLIC_INSIGHT_SOURCES,
+  RESERVED_LIVE_SOURCES,
   validateUpsertInsight,
 };

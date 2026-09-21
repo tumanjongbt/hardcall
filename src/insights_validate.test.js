@@ -52,6 +52,8 @@ fail({ title: 12, value: "+18%" }, "title", "string");
 fail({ title: "ROI", value: "+18%", detail: 9 }, "detail", "string");
 fail({ title: "ROI", value: "+18%", detail: "x".repeat(8001) }, "detail", "length_0_8000");
 fail({ title: "ROI", value: "+18%", source: "playground" }, "source", "enum");
+fail({ title: "ROI", value: "+18%", source: "bls" }, "source", "reserved");
+fail({ title: "ROI", value: "+18%", source: "onet" }, "source", "reserved");
 fail(null, "_", "object_required");
 
 console.log("insights_validate: ok");

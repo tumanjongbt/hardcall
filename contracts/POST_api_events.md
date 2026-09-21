@@ -26,7 +26,7 @@ Phase 1 — public ingest. Neutral path (no `hardcall`). Shape mirrors Protostar
 | `description` | no | omit or null; if present: trim; empty → null; else length 1–4000 |
 | `emoji` | no | omit or null; if present: trim; empty → null; else length 1–16 |
 | `tags` | no | array; default `[]`; each item one of: `high_school_students`, `college_students`, `parents`, `career_counselors`, `workforce_training_managers`; reject duplicates |
-| `source` | no | one of: `synthetic` \| `manual` \| `playground` \| `cli` \| `bls` \| `onet` \| `unknown`. **Omitted anonymous POST defaults to `manual`.** Playground must send `playground`. CLI sends `cli`. Seed/mock ingest should send `synthetic`. `bls` / `onet` are reserved for live adapters (not wired this phase). |
+| `source` | no | **Anonymous public POST may send only:** `synthetic` \| `manual` \| `playground` \| `cli` \| `unknown`. **Omitted anonymous POST defaults to `manual`.** Playground must send `playground`. CLI sends `cli`. Seed/mock ingest should send `synthetic`. `bls` / `onet` remain in the stored/GET enum for future locked ingest (Supernova auth) — **anonymous clients cannot set them** (400 `source` / `reserved`). |
 | `source_url` | no | omit or null; if present: trim; empty → null; else must be `http://` or `https://` (max 2000) |
 | `fetched_at` | no | omit or null; if present: ISO 8601 date or datetime; empty → null; stored as UTC ISO |
 
@@ -55,7 +55,7 @@ After a successful insert the same row is broadcast on `GET /api/events/stream` 
 
 **400** validation — `{ "error": "validation_failed", "details": [ { "field": "title", "rule": "min_length" } ] }`
 
-Unknown `source` uses `rule: "enum"`. Invalid `source_url` uses `rule: "http_url"`. Invalid `fetched_at` uses `rule: "iso_datetime"`.
+Unknown `source` uses `rule: "enum"`. Anonymous `source` of `bls` or `onet` uses `rule: "reserved"`. Invalid `source_url` uses `rule: "http_url"`. Invalid `fetched_at` uses `rule: "iso_datetime"`.
 
 **415** non-JSON body
 
@@ -66,7 +66,7 @@ Unknown `source` uses `rule: "enum"`. Invalid `source_url` uses `rule: "http_url
 | condition | status |
 |-----------|--------|
 | valid body, stored | 201 |
-| missing/invalid channel, title, tag, source, source_url, fetched_at, lengths, unknown keys, non-array tags | 400 |
+| missing/invalid channel, title, tag, source, source_url, fetched_at, reserved live source (`bls`/`onet`), lengths, unknown keys, non-array tags | 400 |
 | wrong content-type | 415 |
 | DB/unavailable | 500 |
 

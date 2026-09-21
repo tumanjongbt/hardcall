@@ -1,5 +1,5 @@
 -- Longer analysis body for each market-insight KPI.
--- Neutral DDL (no hardcall identifiers). Unique title upsert key is unchanged.
+-- Neutral DDL (no product identifiers). Unique title upsert key is unchanged.
 -- Render free-tier does not run release migrate — paste this file in the
 -- Supabase SQL editor after merge (same as 002_insights.sql). The migrate
 -- runner records stem `003_insights_detail` in schema_migrations; after a

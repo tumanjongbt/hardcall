@@ -1,4 +1,4 @@
--- Hardcall Phase 1 — events only. Neutral DDL (no hardcall identifiers).
+-- Phase 1 — events only. Neutral DDL (no product identifiers).
 -- Channel + stakeholder tags locked by Bernard 2026-09-20.
 -- Illegal states blocked: empty title, invalid channel/tag, half-empty optionals as empty strings (API should null them).
 

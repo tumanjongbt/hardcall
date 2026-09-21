@@ -33,11 +33,12 @@ assert.equal(
   ok({ channel: "trade", title: "x", source: "playground" }).source,
   "playground"
 );
+assert.equal(ok({ channel: "trade", title: "x", source: "cli" }).source, "cli");
 assert.equal(
   ok({
     channel: "trade",
     title: "x",
-    source: "bls",
+    source: "playground",
     source_url: " https://www.bls.gov/ooh/ ",
     fetched_at: "2026-09-21T12:00:00.000Z",
   }).source_url,
@@ -53,6 +54,8 @@ fail(
 );
 fail({ channel: "university", title: "x", extra: 1 }, "extra", "unknown_key");
 fail({ channel: "university", title: "x", source: "scraper" }, "source", "enum");
+fail({ channel: "university", title: "x", source: "bls" }, "source", "reserved");
+fail({ channel: "university", title: "x", source: "onet" }, "source", "reserved");
 fail(
   { channel: "university", title: "x", source_url: "ftp://example.com" },
   "source_url",
