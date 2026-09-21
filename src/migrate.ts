@@ -1,7 +1,7 @@
 import "dotenv/config";
 import fs from "node:fs";
 import path from "node:path";
-import { Pool } from "pg";
+import { createPool } from "./db";
 
 const MIGRATION_ID = "001_events";
 
@@ -14,7 +14,7 @@ async function main() {
 
   const sqlPath = path.resolve(__dirname, "../migrations/001_events.sql");
   const sql = fs.readFileSync(sqlPath, "utf8");
-  const pool = new Pool({ connectionString: databaseUrl });
+  const pool = createPool(databaseUrl);
 
   try {
     await pool.query(`

@@ -2,7 +2,10 @@ import { Pool } from "pg";
 import type { CreateEvent, EventRow, EventStore } from "./types";
 
 export function createPool(connectionString: string): Pool {
-  return new Pool({ connectionString });
+  return new Pool({
+    connectionString,
+    ssl: { rejectUnauthorized: false },
+  });
 }
 
 function toIso(value: Date | string): string {

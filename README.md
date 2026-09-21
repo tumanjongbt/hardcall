@@ -27,20 +27,32 @@ Required: `channel`, `title`. Optional: `description`, `emoji`, `tags`. Server s
 
 **Stakeholder tags:** `high_school_students` · `college_students` · `parents` · `career_counselors` · `workforce_training_managers`
 
-## Neon + `DATABASE_URL`
+## `DATABASE_URL` (Neon or Supabase)
 
-1. Create a Neon project ([neon.tech](https://neon.tech)) — Postgres 16+ is fine.
-2. Copy the connection string. Use `sslmode=require`.
-3. For `npm run migrate`, prefer Neon’s **direct** host (not the `-pooler` host) so `CREATE INDEX` / `CREATE TYPE` are not sitting behind transaction-pooling limits.
-4. For the running API, the pooled connection string is fine.
-
-Copy `.env.example` to `.env` locally. Only `.env.example` is committed.
+Copy `.env.example` to `.env` locally. Only `.env.example` is committed. `createPool` enables TLS (`ssl.rejectUnauthorized = false`) so node-pg can talk to hosted poolers.
 
 ```
 DATABASE_URL=postgresql://USER:PASSWORD@HOST/DB?sslmode=require
 PORT=3000
 HOST=0.0.0.0
 ```
+
+**Neon**
+
+1. Create a Neon project ([neon.tech](https://neon.tech)) — Postgres 16+ is fine.
+2. Copy the connection string. Use `sslmode=require`.
+3. For `npm run migrate`, prefer Neon’s **direct** host (not the `-pooler` host) so `CREATE INDEX` / `CREATE TYPE` are not sitting behind transaction-pooling limits.
+4. For the running API, the pooled connection string is fine.
+
+**Supabase**
+
+Use the **transaction pooler** URI, not the direct host:
+
+- Host: `*.pooler.supabase.com` on port **6543**
+- User: `postgres.<project-ref>` (pooler user, not the bare `postgres` role)
+- Example shape: `postgresql://postgres.<project-ref>:[PASSWORD]@aws-0-us-east-1.pooler.supabase.com:6543/postgres?sslmode=require`
+
+Direct `db.<ref>.supabase.co` may not resolve from some environments (Cloud Agent / restricted DNS). The pooler host does. Session pooler (`:5432` on the same pooler hostname) is optional; transaction pooler (`:6543`) is the one that was live-proven for this API.
 
 ## Migrate (Protostar)
 
@@ -102,14 +114,14 @@ Point the host at this repo, set `DATABASE_URL` (and `PORT` if the platform inje
 1. New Web Service from this GitHub repo.
 2. Build: `npm ci && npm run build`
 3. Start: `npm start`
-4. Environment: `DATABASE_URL` = Neon URL.
+4. Environment: `DATABASE_URL` = Neon or Supabase pooler URL.
 5. Release / pre-deploy command: `npm run migrate`
 6. Health check path: `/health`
 
 **Railway**
 
 1. New project → deploy from GitHub.
-2. Add `DATABASE_URL` (Neon). Railway’s `PORT` is picked up automatically.
+2. Add `DATABASE_URL` (Neon or Supabase pooler). Railway’s `PORT` is picked up automatically.
 3. Build command: `npm ci && npm run build`
 4. Start command: `npm start`
 5. Release command: `npm run migrate`
@@ -125,7 +137,7 @@ fly deploy
 
 `Dockerfile` is a multi-stage Node 22 image (`npm start` equivalent: `node dist/server.js`). Set `PORT` to the platform’s listen port if it is not 3000.
 
-After deploy, `GET https://<host>/health` should return `{ "ok": true }`. Then POST a fixture event and confirm the row in Neon.
+After deploy, `GET https://<host>/health` should return `{ "ok": true }`. Then POST a fixture event and confirm the row in Neon or Supabase.
 
 ## Out of scope (later)
 
