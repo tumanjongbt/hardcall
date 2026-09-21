@@ -4,7 +4,7 @@ Real-time career intelligence pipeline — education ROI and automation resilien
 
 Tagline: *the call that shapes your orbit.*
 
-Phase 1 is the always-on ingest API and cloud Postgres store. Scrapers and data sources `POST /api/events`. Phase 1.5 adds a live SSE stream for listening clients and a standalone `events` CLI. The dashboard is later.
+Phase 1 is the always-on ingest API and cloud Postgres store. Scrapers and data sources `POST /api/events`. Phase 1.5 adds a live SSE stream and a standalone `events` CLI. Phase 2 adds `GET /api/events` (history) and a local dashboard that filters, searches, paginates, and stays on the live stream.
 
 ## What ships
 
@@ -12,9 +12,10 @@ Phase 1 is the always-on ingest API and cloud Postgres store. Scrapers and data 
 | --- | --- |
 | Protostar migration | `migrations/001_events.sql` |
 | Orion request validation | `src/events_validate.js` |
-| HTTP contracts | `contracts/POST_api_events.md`, `contracts/GET_api_events_stream.md` |
+| HTTP contracts | `contracts/POST_api_events.md`, `contracts/GET_api_events.md`, `contracts/GET_api_events_stream.md` |
 | TypeScript API | `src/app.ts`, `src/server.ts`, `src/sse_hub.ts` |
 | `events` CLI | `cli/` (own package; see `cli/README.md`) |
+| Dashboard | `dashboard/` (Vite; see `dashboard/README.md`) |
 
 Table name is `events`. Schema identifiers stay product-neutral (no `hardcall` in DDL, routes, or error codes).
 
@@ -84,10 +85,12 @@ npm run build && npm start
 
 - `GET /health` → `{ "ok": true }`
 - `POST /api/events` → `201` + stored row, or `400` / `415` / `500` per the contract
+- `GET /api/events` → `{ "events": [...] }` newest-first (`created_at DESC`, `id DESC`); optional `?channel=` and `?limit=` (default/max 1000)
 - `GET /api/events/stream` → SSE (`text/event-stream`); each new insert is an SSE `message` whose JSON matches the stored row
 
 ```bash
 curl -sS http://127.0.0.1:3000/health
+curl -sS "http://127.0.0.1:3000/api/events?channel=trade&limit=50"
 
 curl -sS -X POST http://127.0.0.1:3000/api/events \
   -H 'Content-Type: application/json' \
@@ -123,6 +126,31 @@ Local:
 ```bash
 curl -N http://127.0.0.1:3000/api/events/stream
 ```
+
+`GET /api/events` is public and CORS-open so the local dashboard can read history. Search, page size, and page number are client-side (see `dashboard/`). The list endpoint only filters by `channel` and caps `limit`.
+
+### Dashboard (local)
+
+Vite app in `dashboard/`. Logic and styles are separate files.
+
+```bash
+cd dashboard
+npm install
+npm run dev
+```
+
+Default API base is `https://hardcall-api.onrender.com` (`VITE_EVENTS_API_URL`). After this branch is merged, Render must redeploy before production `GET /api/events` exists. Until then, point the dashboard at a local API:
+
+```bash
+# repo root — in-memory store, no DATABASE_URL
+npm run dev:memory
+
+# other terminal
+cd dashboard
+VITE_EVENTS_API_URL=http://127.0.0.1:3000 npm run dev
+```
+
+The feed stays reverse-chronological, listens on SSE, filters by channel, debounces search by 300ms, paginates (50 / 100 / all), and writes `page`, `perPage`, `channel`, and `q` into the URL for bookmarking.
 
 ### `events` CLI
 
@@ -194,4 +222,4 @@ After deploy, `GET https://<host>/health` should return `{ "ok": true }`. Then P
 
 ## Out of scope (later)
 
-Dashboard / feed / charts, scrapers, ingest auth, and multi-instance stream fan-out (today’s hub is in-process).
+Hosted dashboard (static on Vercel), charts, scrapers, ingest auth, and multi-instance stream fan-out (today’s hub is in-process).

@@ -14,5 +14,5 @@
     "types": ["node"]
   },
   "include": ["src/**/*.ts", "src/**/*.js"],
-  "exclude": ["src/**/*.test.ts", "src/**/*.test.js"]
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.js", "src/dev_memory_server.ts"]
 }

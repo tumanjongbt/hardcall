@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hardcall — event feed</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <div class="sky">
+      <header class="masthead">
+        <div>
+          <p class="wordmark">Hardcall</p>
+          <p class="tagline">the call that shapes your orbit.</p>
+        </div>
+        <div id="stream-status" aria-live="polite"></div>
+      </header>
+
+      <section class="panel" aria-label="Feed filters">
+        <div class="controls">
+          <div>
+            <span class="control-label" id="channel-label">Channel</span>
+            <div
+              id="channel-filters"
+              class="chip-row"
+              role="group"
+              aria-labelledby="channel-label"
+            ></div>
+          </div>
+          <div>
+            <label class="control-label" for="search">Search</label>
+            <input
+              id="search"
+              class="search"
+              type="search"
+              placeholder="Title, description, or tags"
+              autocomplete="off"
+            />
+          </div>
+          <div>
+            <span class="control-label" id="per-page-label">Per page</span>
+            <div
+              id="per-page"
+              class="chip-row"
+              role="group"
+              aria-labelledby="per-page-label"
+            ></div>
+          </div>
+        </div>
+      </section>
+
+      <div class="toolbar">
+        <p id="feed-meta"></p>
+      </div>
+      <main id="feed" aria-live="polite"></main>
+      <nav id="pagination" class="pagination" aria-label="Pagination"></nav>
+
+      <p class="footnote">
+        History from <code>GET /api/events</code>. Live rows from
+        <code>GET /api/events/stream</code>. Filters live in the URL so a counselor can bookmark this view.
+      </p>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
