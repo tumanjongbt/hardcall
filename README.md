@@ -81,9 +81,29 @@ npm run migrate    # applies pending files in migrations/ (001_events, 002_insig
 
 ```sql
 -- 1. Paste the full contents of migrations/005_live_source_integrity.sql
+--    (UPDATE remaps spoofed bls/onet rows with NULL source_url or fetched_at
+--    to unknown, then DROP/ADD events_live_source_integrity)
 -- 2. Then:
 INSERT INTO schema_migrations (id) VALUES ('005_live_source_integrity')
 ON CONFLICT (id) DO NOTHING;
+```
+
+If `005_live_source_integrity` is already recorded in `schema_migrations` but the CHECK was never added (ERROR 23514 on the first paste, or the stem was inserted after a failed apply), the runner will skip the file. Run the remapping + constraint by hand, then leave the stem as-is:
+
+```sql
+UPDATE events
+SET source = 'unknown'
+WHERE source IN ('bls', 'onet')
+  AND (source_url IS NULL OR fetched_at IS NULL);
+
+ALTER TABLE events
+  DROP CONSTRAINT IF EXISTS events_live_source_integrity;
+
+ALTER TABLE events
+  ADD CONSTRAINT events_live_source_integrity CHECK (
+    source NOT IN ('bls', 'onet')
+    OR (source_url IS NOT NULL AND fetched_at IS NOT NULL)
+  );
 ```
 
 After that, redeploy the Render web service so `source` / `source_url` / `fetched_at` are on events and `source` is on insights. Then (optional) re-seed analysis bodies with `source: "synthetic"`:
