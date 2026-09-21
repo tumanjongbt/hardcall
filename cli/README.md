@@ -42,7 +42,7 @@ events push --channel <CHANNEL> --title <TITLE> \
 | `--tags` | `tags` | optional comma-separated list → JSON string array |
 | `--api-url` | — | API **base** URL (no path). Overrides `EVENTS_API_URL` |
 
-The CLI always sends `source: "cli"` so dashboard badges can distinguish CLI rows from Playground, seed, or live adapters.
+The CLI always sends `source: "cli"` so dashboard badges can distinguish CLI rows from Playground, seed, or live adapters. When `HARDCALL_ALLOW_DEMO=false` (or `NODE_ENV=production` without that flag), the CLI refuses to POST.
 
 **Tags:** `high_school_students` · `college_students` · `parents` · `career_counselors` · `workforce_training_managers`
 

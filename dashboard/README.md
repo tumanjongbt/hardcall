@@ -12,7 +12,9 @@ npm install
 npm run dev
 ```
 
-Open the Vite URL (default `http://127.0.0.1:5173`). The Events tab reads history from `GET {API}/api/events` and listens on `GET {API}/api/events/stream`. **Pipe live** means the SSE socket is connected — it is not a claim that BLS/O*NET adapters are shipping live rows. Event cards badge `source` (`Demo`, `Playground`, `CLI`, `Manual`, `Live · BLS`, `Live · O*NET`). Charts (`?tab=charts`) aggregate that same event store (demo until live sources exist). The Market Insights tab polls `GET {API}/api/insights` on mount and every **15 seconds**. KPI cards are buttons: click (or Enter / Space) opens a side drawer with that tile’s `detail` analysis. Esc or Close returns to the grid. An open drawer stays open across the 15s poll and updates in place if that id is still present. Playground (`?tab=playground`) maps the event contract to a form, highlights the exact native `fetch()` a scraper would run (Copy copies that snippet), and Submit posts that JSON to `{API}/api/events` with `source: "playground"`. **Fill Sample** cycles five named catalog entries in `src/playgroundSamples.ts` (trade overtime, university tuition, apprenticeship seats, community-college cert, automation risk). **Reset** clears the form, the sample cursor, the error banner, and the success toast. Admin (`?tab=admin`) accepts a `.json` file (drag-and-drop or Choose). Client-side parse converts `minutes_ago` to `created_at`, defaults `source` to `synthetic`, then POSTs events then insights sequentially. A tiny fixture lives at `public/seed-example.json`.
+Open the Vite URL (default `http://127.0.0.1:5173`). The Events tab reads history from `GET {API}/api/events` and listens on `GET {API}/api/events/stream`. **Pipe live** means the SSE socket is connected. Event cards badge `source` (`Live · Scorecard`, `Live · BLS`, `Live · O*NET`, `Live · Apprenticeship`, `Manual`, `Demo`, `Playground`, `CLI`). Charts (`?tab=charts`) aggregate that same event store. The footer credits College Scorecard, BLS OEWS, O*NET (USDOL/ETA, CC BY 4.0), and DOL registered apprenticeship. The Market Insights tab polls `GET {API}/api/insights` on mount and every **15 seconds**. KPI cards are buttons: click (or Enter / Space) opens a side drawer with that tile’s `detail` analysis. Esc or Close returns to the grid. An open drawer stays open across the 15s poll and updates in place if that id is still present.
+
+On production (`GET /api/meta` `allow_demo: false`, or `VITE_HARDCALL_ALLOW_DEMO=false`) Playground and Admin tabs are hidden and the API **403**s `synthetic` / `playground` / `cli` writes. Staging can leave demo on. Playground (`?tab=playground`) maps the event contract to a form, highlights the exact native `fetch()` a scraper would run (Copy copies that snippet), and Submit posts that JSON to `{API}/api/events` with `source: "playground"`. **Fill Sample** cycles five named catalog entries in `src/playgroundSamples.ts`. **Reset** clears the form. Admin (`?tab=admin`) accepts a `.json` file; default `source` is `synthetic`. Fixture: `public/seed-example.json`. Live rows come from `npm run ingest` on the API (see repo `docs/DEPLOY.md`), not from these tabs.
 
 ```bash
 npm test
@@ -139,12 +141,12 @@ curl -sS -D - -X POST https://hardcall-api.onrender.com/api/events \
 
 Expect `HTTP/1.1 201` and JSON with `id` + the same title. The playground Submit button fires this same body.
 
-Bulk synthetic records (BLS/O*NET-style demo, no live keys): `prompts/MOCK_INGESTION_SCRIPT_PROMPT.md` — pointer `scripts/mock-ingest-from-prompt.md`.
+Bulk synthetic records (staging / `HARDCALL_ALLOW_DEMO=true` only): `prompts/MOCK_INGESTION_SCRIPT_PROMPT.md` — pointer `scripts/mock-ingest-from-prompt.md`. Production must use `npm run ingest` against official bulk feeds.
 
 ## Production checklist
 
 - `VITE_EVENTS_API_URL` is the API **origin only**. It ships in the browser bundle — no secrets.
 - API CORS is open (`*`) this phase. Documented above; restrict when auth exists.
 - `npm --prefix dashboard test && npm --prefix dashboard run build` before a static deploy. Vite copies `public/logo.png`, `public/banner-celestial.png`, `public/favicon.png`, and `public/apple-touch-icon.png` into `dist/`.
-- **Render free migrate caveat:** the API service does not run a release command on free tier. After merge, paste `migrations/004_event_provenance.sql` in the Supabase SQL editor and `INSERT INTO schema_migrations (id) VALUES ('004_event_provenance') ON CONFLICT (id) DO NOTHING`, then redeploy the web service. Railway / Fly can run `npm run migrate` on release.
+- **Render free migrate caveat:** the API service does not run a release command on free tier. After merge, paste `migrations/006_domain_warehouse.sql` in the Supabase SQL editor and `INSERT INTO schema_migrations (id) VALUES ('006_domain_warehouse') ON CONFLICT (id) DO NOTHING`, then redeploy the web service and run the ingest cron. Production API must set `HARDCALL_ALLOW_DEMO=false`. See `docs/DEPLOY.md`. Railway / Fly can run `npm run migrate` on release.
 - Hosted dashboard (Vercel) is still later. Until then, run Vite locally against the live or local API.

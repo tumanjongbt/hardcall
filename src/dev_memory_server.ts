@@ -94,9 +94,16 @@ function createMemoryStore(
       rows.unshift(row);
       return row;
     },
-    async listEvents({ limit, channel }) {
+    async listEvents({ limit, channel, includeDemo }) {
       return rows
         .filter((row) => !channel || row.channel === channel)
+        .filter(
+          (row) =>
+            includeDemo !== false ||
+            (row.source !== "synthetic" &&
+              row.source !== "playground" &&
+              row.source !== "cli")
+        )
         .sort((a, b) => {
           const byTime = b.created_at.localeCompare(a.created_at);
           return byTime !== 0 ? byTime : b.id.localeCompare(a.id);
@@ -110,6 +117,8 @@ function createMemoryStore(
         existing.value = value.value;
         if (value.detail !== undefined) existing.detail = value.detail;
         if (value.source !== undefined) existing.source = value.source;
+        if (value.source_url !== undefined) existing.source_url = value.source_url;
+        if (value.fetched_at !== undefined) existing.fetched_at = value.fetched_at;
         existing.updated_at = now;
         return { row: { ...existing }, created: false };
       }
@@ -119,17 +128,21 @@ function createMemoryStore(
         value: value.value,
         detail: value.detail ?? "",
         source: value.source ?? "synthetic",
+        source_url: value.source_url ?? null,
+        fetched_at: value.fetched_at ?? null,
         created_at: now,
         updated_at: now,
       };
       insights.unshift(row);
       return { row, created: true };
     },
-    async listInsights() {
-      return [...insights].sort((a, b) => {
-        const byTime = b.updated_at.localeCompare(a.updated_at);
-        return byTime !== 0 ? byTime : a.title.localeCompare(b.title);
-      });
+    async listInsights(query) {
+      return [...insights]
+        .filter((row) => query?.includeDemo !== false || row.source !== "synthetic")
+        .sort((a, b) => {
+          const byTime = b.updated_at.localeCompare(a.updated_at);
+          return byTime !== 0 ? byTime : a.title.localeCompare(b.title);
+        });
     },
   };
 }
@@ -169,6 +182,8 @@ function seedRows(): EventRow[] {
       source: "synthetic",
       source_url: null,
       fetched_at: null,
+      source_url: null,
+      fetched_at: null,
     });
   }
   const fixtures: EventRow[] = FIXTURES.map((value, i) => ({
@@ -192,6 +207,8 @@ function seedInsights(): InsightRow[] {
     value: value.value,
     detail: value.detail ?? "",
     source: "synthetic",
+    source_url: null,
+    fetched_at: null,
     created_at: new Date(start).toISOString(),
     updated_at: new Date(start + i * 60_000).toISOString(),
   }));

@@ -2,7 +2,7 @@
 
 Phase 1.5 — live event stream for listening clients. Neutral path (no `hardcall`). In-memory fan-out on a single API process.
 
-SSE connection status is not the same as data provenance. A connected pipe can still be carrying `synthetic` / `playground` / `cli` rows. `bls` / `onet` remain reserved until locked ingest auth — anonymous `POST /api/events` cannot mint them.
+SSE connection status is not the same as data provenance. A connected pipe can still be carrying `synthetic` / `playground` / `cli` rows when demo is on. Reserved live sources remain adapter-only — anonymous `POST /api/events` cannot mint them.
 
 ## Request
 

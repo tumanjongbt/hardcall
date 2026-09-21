@@ -83,6 +83,7 @@ test("push maps --icon/--tags and prints 201 JSON", async () => {
       "college_students, parents",
     ],
     {
+      env: { HARDCALL_ALLOW_DEMO: "true" },
       fetch: async (url, init) => {
         captured = { url, init };
         return { status: 201, text: async () => JSON.stringify(row) };
@@ -150,6 +151,7 @@ test("EVENTS_API_URL is used when --api-url is omitted", async () => {
 test("non-201 exits 1 and prints the body on stderr", async () => {
   const stderr = capture();
   const code = await main(["push", "--channel", "trade", "--title", "x"], {
+    env: { HARDCALL_ALLOW_DEMO: "true" },
     fetch: async () => ({
       status: 400,
       text: async () => '{"error":"validation_failed"}',
@@ -165,6 +167,7 @@ test("non-201 exits 1 and prints the body on stderr", async () => {
 test("network failure exits 1", async () => {
   const stderr = capture();
   const code = await main(["push", "--channel", "trade", "--title", "x"], {
+    env: { HARDCALL_ALLOW_DEMO: "true" },
     fetch: async () => {
       throw new Error("ECONNREFUSED");
     },
@@ -173,6 +176,23 @@ test("network failure exits 1", async () => {
   });
   assert.equal(code, 1);
   assert.match(stderr.out, /ECONNREFUSED/);
+});
+
+test("HARDCALL_ALLOW_DEMO=false refuses synthetic CLI push", async () => {
+  let called = false;
+  const stderr = capture();
+  const code = await main(["push", "--channel", "trade", "--title", "x"], {
+    env: { HARDCALL_ALLOW_DEMO: "false", NODE_ENV: "production" },
+    fetch: async () => {
+      called = true;
+      return { status: 201, text: async () => "{}" };
+    },
+    stdout: capture(),
+    stderr,
+  });
+  assert.equal(code, 1);
+  assert.equal(called, false);
+  assert.match(stderr.out, /demo ingest is disabled/);
 });
 
 test("bin --help prints usage", async () => {

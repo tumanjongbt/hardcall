@@ -2,6 +2,37 @@ import { apiBase, LIST_FETCH_LIMIT } from "./config";
 import { formatApiError } from "./playground";
 import type { EventRow, InsightRow, StreamStatus } from "./types";
 
+export type ApiMeta = {
+  ok: boolean;
+  allow_demo: boolean;
+  live_sources: string[];
+  warehouse?: {
+    institutions: number;
+    programs: number;
+    apprenticeship_sponsors: number;
+    occupations: number;
+    wage_observations: number;
+    projections: number;
+    latest_fetched_at: string | null;
+  };
+};
+
+export async function fetchMeta(base = apiBase()): Promise<ApiMeta> {
+  const res = await fetch(`${base}/api/meta`);
+  if (!res.ok) {
+    const error = new Error(`HTTP ${res.status}`) as Error & { status: number };
+    error.status = res.status;
+    throw error;
+  }
+  const body = (await res.json()) as ApiMeta;
+  return {
+    ok: body.ok !== false,
+    allow_demo: body.allow_demo !== false,
+    live_sources: Array.isArray(body.live_sources) ? body.live_sources : [],
+    warehouse: body.warehouse,
+  };
+}
+
 export function parseInsightsPayload(body: unknown): InsightRow[] {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     throw new Error("invalid_insights_payload");

@@ -105,8 +105,9 @@
           <nav id="pagination" class="pagination" aria-label="Pagination"></nav>
 
           <p class="footnote">
-            History plus the SSE pipe. Badges show whether a row is demo, playground,
-            CLI, or live. Channel, search, and page stay in the URL.
+            History plus the SSE pipe. Live badges are Scorecard, BLS, O*NET, or
+            registered apprenticeship rows from server-side adapters. Demo / playground / CLI
+            writes are blocked when the API is in production mode.
           </p>
         </section>
 
@@ -119,8 +120,8 @@
           <section id="chart-filters" class="panel" aria-label="Chart decision filters"></section>
           <section id="charts" aria-label="Event charts"></section>
           <p class="footnote">
-            Charts aggregate the event store (demo / playground / CLI until live BLS
-            and O*NET adapters ship). Forecast is telemetry, not a path recommendation.
+            Charts aggregate the event store. Live badges mark official adapter rows
+            (Scorecard, BLS, O*NET, apprenticeship.gov). Forecast is telemetry, not a path recommendation.
           </p>
         </section>
 
@@ -135,8 +136,9 @@
           </div>
           <section id="insights" aria-label="Market insights" aria-live="polite"></section>
           <p class="footnote">
-            KPI cards refresh every 15 seconds. <strong>Demo KPI</strong> means the
-            value is a seed, not a live BLS/O*NET feed. Click a card for the analysis.
+            KPI cards refresh every 15 seconds. Live badges are derived from official
+            warehouse tables. <strong>Demo KPI</strong> means a seed value — hidden in production
+            when <code>HARDCALL_ALLOW_DEMO=false</code>. Click a card for the analysis.
           </p>
         </section>
 
@@ -330,6 +332,7 @@
           </p>
         </section>
       </main>
+      <footer id="attribution" class="site-footer"></footer>
     </div>
     <div id="insight-detail" hidden></div>
     <script type="module" src="/src/main.ts"></script>

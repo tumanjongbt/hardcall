@@ -56,6 +56,13 @@ fail({ channel: "university", title: "x", extra: 1 }, "extra", "unknown_key");
 fail({ channel: "university", title: "x", source: "scraper" }, "source", "enum");
 fail({ channel: "university", title: "x", source: "bls" }, "source", "reserved");
 fail({ channel: "university", title: "x", source: "onet" }, "source", "reserved");
+fail({ channel: "university", title: "x", source: "scorecard" }, "source", "reserved");
+fail(
+  { channel: "university", title: "x", source: "apprenticeship_gov" },
+  "source",
+  "reserved"
+);
+fail({ channel: "university", title: "x", source: "bls_ep" }, "source", "reserved");
 fail(
   { channel: "university", title: "x", source_url: "ftp://example.com" },
   "source_url",

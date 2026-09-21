@@ -32,9 +32,16 @@ function memoryStore(
       rows.unshift(row);
       return row;
     },
-    async listEvents({ limit, channel }) {
+    async listEvents({ limit, channel, includeDemo }) {
       return rows
         .filter((row) => !channel || row.channel === channel)
+        .filter(
+          (row) =>
+            includeDemo !== false ||
+            (row.source !== "synthetic" &&
+              row.source !== "playground" &&
+              row.source !== "cli")
+        )
         .sort((a, b) => {
           const byTime = b.created_at.localeCompare(a.created_at);
           return byTime !== 0 ? byTime : b.id.localeCompare(a.id);
@@ -48,6 +55,8 @@ function memoryStore(
         existing.value = value.value;
         if (value.detail !== undefined) existing.detail = value.detail;
         if (value.source !== undefined) existing.source = value.source;
+        if (value.source_url !== undefined) existing.source_url = value.source_url;
+        if (value.fetched_at !== undefined) existing.fetched_at = value.fetched_at;
         existing.updated_at = now;
         return { row: { ...existing }, created: false };
       }
@@ -57,17 +66,21 @@ function memoryStore(
         value: value.value,
         detail: value.detail ?? "",
         source: value.source ?? "synthetic",
+        source_url: value.source_url ?? null,
+        fetched_at: value.fetched_at ?? null,
         created_at: now,
         updated_at: now,
       };
       insights.unshift(row);
       return { row, created: true };
     },
-    async listInsights() {
-      return [...insights].sort((a, b) => {
-        const byTime = b.updated_at.localeCompare(a.updated_at);
-        return byTime !== 0 ? byTime : a.title.localeCompare(b.title);
-      });
+    async listInsights(query) {
+      return [...insights]
+        .filter((row) => query?.includeDemo !== false || row.source !== "synthetic")
+        .sort((a, b) => {
+          const byTime = b.updated_at.localeCompare(a.updated_at);
+          return byTime !== 0 ? byTime : a.title.localeCompare(b.title);
+        });
     },
   };
 }
@@ -564,6 +577,8 @@ const insightSeed: InsightRow[] = [
     value: "+6%",
     detail: "Four-year ROI is still positive in this metro, but slower than short paths.",
     source: "synthetic",
+    source_url: null,
+    fetched_at: null,
     created_at: "2026-09-20T10:00:00.000Z",
     updated_at: "2026-09-20T10:00:00.000Z",
   },
@@ -573,6 +588,8 @@ const insightSeed: InsightRow[] = [
     value: "+18%",
     detail: "",
     source: "synthetic",
+    source_url: null,
+    fetched_at: null,
     created_at: "2026-09-21T09:00:00.000Z",
     updated_at: "2026-09-21T11:00:00.000Z",
   },
@@ -621,6 +638,8 @@ test("POST /api/insight inserts then upserts on exact title", async () => {
       value: "+18%",
       detail: "",
       source: "synthetic",
+      source_url: null,
+      fetched_at: null,
       created_at: "2026-09-21T12:00:00.000Z",
       updated_at: "2026-09-21T12:00:00.000Z",
     });
@@ -768,7 +787,13 @@ test("POST /api/insight persist failure is opaque", async () => {
 
 test("POST /api/events rejects reserved live sources", async () => {
   await withApp(memoryStore(), async (app) => {
-    for (const source of ["bls", "onet"] as const) {
+    for (const source of [
+      "bls",
+      "onet",
+      "scorecard",
+      "apprenticeship_gov",
+      "bls_ep",
+    ] as const) {
       const res = await app.inject({
         method: "POST",
         url: "/api/events",
@@ -797,7 +822,13 @@ test("POST /api/events rejects reserved live sources", async () => {
 
 test("POST /api/insight rejects reserved live sources", async () => {
   await withApp(memoryStore(), async (app) => {
-    for (const source of ["bls", "onet"] as const) {
+    for (const source of [
+      "bls",
+      "onet",
+      "scorecard",
+      "apprenticeship_gov",
+      "bls_ep",
+    ] as const) {
       const res = await app.inject({
         method: "POST",
         url: "/api/insight",
@@ -969,4 +1000,76 @@ test("POST /api/events persist failure is opaque", async () => {
       assert.equal(res.body.includes("secret-host"), false);
     }
   );
+});
+
+test("GET /api/meta reports demo gate", async () => {
+  await withApp(memoryStore(), async (app) => {
+    const res = await app.inject({ method: "GET", url: "/api/meta" });
+    assert.equal(res.statusCode, 200);
+    const body = res.json() as { allow_demo: boolean; live_sources: string[] };
+    assert.equal(body.allow_demo, true);
+    assert.ok(body.live_sources.includes("scorecard"));
+    assert.ok(body.live_sources.includes("apprenticeship_gov"));
+  });
+  const app = createApp(memoryStore(), { allowDemo: false });
+  await app.ready();
+  try {
+    const res = await app.inject({ method: "GET", url: "/api/meta" });
+    assert.equal(res.json().allow_demo, false);
+  } finally {
+    await app.close();
+  }
+});
+
+test("HARDCALL_ALLOW_DEMO=false 403s playground, seed, and cli writes", async () => {
+  const app = createApp(memoryStore(), { allowDemo: false });
+  await app.ready();
+  try {
+    for (const source of ["synthetic", "playground", "cli"] as const) {
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/events",
+        headers: { "content-type": "application/json" },
+        payload: { channel: "trade", title: "Demo write", source },
+      });
+      assert.equal(res.statusCode, 403, source);
+      assert.deepEqual(res.json(), { error: "demo_disabled" });
+    }
+    const insight = await app.inject({
+      method: "POST",
+      url: "/api/insight",
+      headers: { "content-type": "application/json" },
+      payload: { title: "Seed KPI", value: "+1%", source: "synthetic" },
+    });
+    assert.equal(insight.statusCode, 403);
+    assert.deepEqual(insight.json(), { error: "demo_disabled" });
+    const omittedInsight = await app.inject({
+      method: "POST",
+      url: "/api/insight",
+      headers: { "content-type": "application/json" },
+      payload: { title: "Seed KPI", value: "+1%" },
+    });
+    assert.equal(omittedInsight.statusCode, 403);
+    const manual = await app.inject({
+      method: "POST",
+      url: "/api/events",
+      headers: { "content-type": "application/json" },
+      payload: { channel: "trade", title: "Human note", source: "manual" },
+    });
+    assert.equal(manual.statusCode, 201);
+  } finally {
+    await app.close();
+  }
+});
+
+test("demo-off GET hides synthetic rows", async () => {
+  const app = createApp(memoryStore(undefined, seedRows), { allowDemo: false });
+  await app.ready();
+  try {
+    const res = await app.inject({ method: "GET", url: "/api/events" });
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(res.json(), { events: [] });
+  } finally {
+    await app.close();
+  }
 });

@@ -144,9 +144,13 @@ export function renderMeta(
     : "All channels";
   const q = model.view.q ? ` · “${model.view.q}”` : "";
   const provenance =
-    model.liveCount === 0
-      ? " · feed is demo until live sources exist"
-      : ` · ${model.liveCount} live · ${model.demoCount} demo`;
+    model.liveCount === 0 && model.demoCount === 0
+      ? ""
+      : model.liveCount === 0
+        ? " · no live-source rows in this feed"
+        : model.demoCount === 0
+          ? ` · ${model.liveCount} live`
+          : ` · ${model.liveCount} live · ${model.demoCount} demo`;
   root.textContent = model.loading
     ? "Loading feed…"
     : `${model.total} event${model.total === 1 ? "" : "s"} · ${channel}${q}${provenance}`;
@@ -209,6 +213,15 @@ function renderCard(event: EventRow, fresh: boolean): HTMLLIElement {
     }
     card.append(tags);
   }
+  if (event.source_url) {
+    const link = document.createElement("a");
+    link.className = "event-card__source";
+    link.href = event.source_url;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.textContent = "Open source";
+    card.append(link);
+  }
   return card;
 }
 
@@ -223,7 +236,8 @@ export type InsightsModel = {
 export function renderTabs(
   root: HTMLElement,
   tab: DashboardTab,
-  onTab: (tab: DashboardTab) => void
+  onTab: (tab: DashboardTab) => void,
+  opts: { allowDemo?: boolean } = {}
 ): void {
   root.replaceChildren();
   root.setAttribute("role", "tablist");
@@ -231,9 +245,13 @@ export function renderTabs(
     { value: "events", label: "Events" },
     { value: "charts", label: "Charts" },
     { value: "insights", label: "Market Insights" },
-    { value: "playground", label: "Playground" },
-    { value: "admin", label: "Admin" },
   ];
+  if (opts.allowDemo !== false) {
+    options.push(
+      { value: "playground", label: "Playground" },
+      { value: "admin", label: "Admin" }
+    );
+  }
   for (const option of options) {
     const selected = tab === option.value;
     const button = el("button", "tab", option.label);
@@ -380,6 +398,15 @@ export function renderInsightDetail(
   if (body.empty) detail.classList.add("is-empty");
 
   drawer.append(close, title, badge, value, when, detail);
+  if (insight.source_url) {
+    const link = document.createElement("a");
+    link.className = "insight-drawer__source";
+    link.href = insight.source_url;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.textContent = "Open source";
+    drawer.append(link);
+  }
   backdrop.append(drawer);
   root.append(backdrop);
   close.focus();
@@ -547,4 +574,27 @@ export function renderAdminStatus(root: HTMLElement, status: AdminSeedStatus): v
     box.append(list);
   }
   root.append(box);
+}
+
+export function renderAttribution(
+  root: HTMLElement,
+  model: { allowDemo: boolean; fetchedAt: string | null }
+): void {
+  root.replaceChildren();
+  const credit = el(
+    "p",
+    "site-footer__credit",
+    "Data: U.S. Department of Education College Scorecard · U.S. Bureau of Labor Statistics OEWS · O*NET Database by USDOL/ETA (CC BY 4.0; O*NET® is a trademark of USDOL/ETA) · U.S. Department of Labor registered apprenticeship partner sponsors."
+  );
+  const mode = el(
+    "p",
+    "site-footer__mode",
+    model.allowDemo
+      ? "Staging/demo writes are enabled on this API."
+      : "Production mode: seed, playground, and synthetic CLI writes are disabled. Live badges come only from server-side adapters."
+  );
+  root.append(credit, mode);
+  if (model.fetchedAt) {
+    root.append(el("p", "site-footer__asof", `Warehouse data as of ${formatWhen(model.fetchedAt)}`));
+  }
 }

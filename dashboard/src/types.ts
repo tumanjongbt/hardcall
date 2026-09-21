@@ -7,9 +7,20 @@ export type EventSource =
   | "cli"
   | "bls"
   | "onet"
+  | "scorecard"
+  | "apprenticeship_gov"
+  | "bls_ep"
   | "unknown";
 
-export type InsightSource = "synthetic" | "manual" | "bls" | "onet" | "unknown";
+export type InsightSource =
+  | "synthetic"
+  | "manual"
+  | "bls"
+  | "onet"
+  | "scorecard"
+  | "apprenticeship_gov"
+  | "bls_ep"
+  | "unknown";
 
 export type EventRow = {
   id: string;
@@ -30,6 +41,8 @@ export type InsightRow = {
   value: string;
   detail: string;
   source?: InsightSource | string;
+  source_url?: string | null;
+  fetched_at?: string | null;
   created_at: string;
   updated_at: string;
 };

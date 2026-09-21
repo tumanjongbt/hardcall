@@ -57,6 +57,8 @@ function mapInsightRow(row: {
   value: string;
   detail: string;
   source: InsightSource;
+  source_url?: string | null;
+  fetched_at?: Date | string | null;
   created_at: Date | string;
   updated_at: Date | string;
 }): InsightRow {
@@ -66,6 +68,8 @@ function mapInsightRow(row: {
     value: row.value,
     detail: row.detail ?? "",
     source: row.source,
+    source_url: row.source_url ?? null,
+    fetched_at: toIsoOrNull(row.fetched_at),
     created_at: toIso(row.created_at),
     updated_at: toIso(row.updated_at),
   };
@@ -94,30 +98,36 @@ export function createPgStore(pool: Pool): Store {
       return mapRow(rows[0]);
     },
     async listEvents(query): Promise<EventRow[]> {
+      const includeDemo = query.includeDemo !== false;
       const { rows } = await pool.query(
         `SELECT id, channel, title, description, emoji, tags::text[] AS tags, created_at,
                 source, source_url, fetched_at
          FROM events
          WHERE ($1::text IS NULL OR channel = $1::event_channel)
+           AND ($3::boolean OR source NOT IN ('synthetic', 'playground', 'cli'))
          ORDER BY created_at DESC, id DESC
          LIMIT $2`,
-        [query.channel ?? null, query.limit]
+        [query.channel ?? null, query.limit, includeDemo]
       );
       return rows.map(mapRow);
     },
     async upsertInsight(value: CreateInsight): Promise<{ row: InsightRow; created: boolean }> {
       const detail = value.detail === undefined ? null : value.detail;
       const source = value.source === undefined ? null : value.source;
+      const sourceUrl = value.source_url === undefined ? null : value.source_url;
+      const fetchedAt = value.fetched_at === undefined ? null : value.fetched_at;
       const { rows } = await pool.query(
-        `INSERT INTO insights (title, value, detail, source)
-         VALUES ($1, $2, COALESCE($3, ''), COALESCE($4, 'synthetic'))
+        `INSERT INTO insights (title, value, detail, source, source_url, fetched_at)
+         VALUES ($1, $2, COALESCE($3, ''), COALESCE($4, 'synthetic'), $5, $6)
          ON CONFLICT (title) DO UPDATE
            SET value = EXCLUDED.value,
                detail = COALESCE($3, insights.detail),
                source = COALESCE($4, insights.source),
+               source_url = COALESCE($5, insights.source_url),
+               fetched_at = COALESCE($6, insights.fetched_at),
                updated_at = now()
-         RETURNING id, title, value, detail, source, created_at, updated_at, (xmax = 0) AS inserted`,
-        [value.title, value.value, detail, source]
+         RETURNING id, title, value, detail, source, source_url, fetched_at, created_at, updated_at, (xmax = 0) AS inserted`,
+        [value.title, value.value, detail, source, sourceUrl, fetchedAt]
       );
       const row = rows[0];
       return {
@@ -125,11 +135,14 @@ export function createPgStore(pool: Pool): Store {
         created: Boolean(row.inserted),
       };
     },
-    async listInsights(): Promise<InsightRow[]> {
+    async listInsights(query): Promise<InsightRow[]> {
+      const includeDemo = query?.includeDemo !== false;
       const { rows } = await pool.query(
-        `SELECT id, title, value, detail, source, created_at, updated_at
+        `SELECT id, title, value, detail, source, source_url, fetched_at, created_at, updated_at
          FROM insights
-         ORDER BY updated_at DESC, title ASC`
+         WHERE ($1::boolean OR source <> 'synthetic')
+         ORDER BY updated_at DESC, title ASC`,
+        [includeDemo]
       );
       return rows.map(mapInsightRow);
     },

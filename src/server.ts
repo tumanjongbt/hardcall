@@ -1,6 +1,8 @@
 import "dotenv/config";
 import { createApp } from "./app";
 import { createPgStore, createPool } from "./db";
+import { allowDemoFromEnv } from "./demo_gate";
+import { createPgWarehouse } from "./ingest/warehouse";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {
@@ -10,9 +12,14 @@ if (!databaseUrl) {
 
 const port = Number(process.env.PORT) || 3000;
 const host = process.env.HOST || "0.0.0.0";
+const allowDemo = allowDemoFromEnv();
 
 const pool = createPool(databaseUrl);
-const app = createApp(createPgStore(pool), { logger: true });
+const app = createApp(createPgStore(pool), {
+  logger: true,
+  allowDemo,
+  warehouse: createPgWarehouse(pool),
+});
 
 async function shutdown(signal: string) {
   app.log.info({ signal }, "shutting down");
