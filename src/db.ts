@@ -15,7 +15,7 @@ export function createPgStore(pool: Pool): EventStore {
       const { rows } = await pool.query(
         `INSERT INTO events (channel, title, description, emoji, tags)
          VALUES ($1, $2, $3, $4, $5::stakeholder_tag[])
-         RETURNING id, channel, title, description, emoji, tags, created_at`,
+         RETURNING id, channel, title, description, emoji, tags::text[] AS tags, created_at`,
         [value.channel, value.title, value.description, value.emoji, value.tags]
       );
       const row = rows[0];
