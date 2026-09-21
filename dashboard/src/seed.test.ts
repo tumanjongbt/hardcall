@@ -38,6 +38,19 @@ test("parseSeedJson treats missing arrays as empty and rejects junk", () => {
   if (onlyEvents.ok) assert.deepEqual(onlyEvents.value.insights, []);
 });
 
+test("parseSeedJson ignores optional project key", () => {
+  const parsed = parseSeedJson(
+    JSON.stringify({
+      project: "hardcall",
+      events: [{ channel: "growing-jobs", title: "HVAC" }],
+    })
+  );
+  assert.equal(parsed.ok, true);
+  if (!parsed.ok) return;
+  assert.equal(parsed.value.events.length, 1);
+  assert.equal(parsed.value.insights.length, 0);
+});
+
 test("eventToPostPayload converts minutes_ago and defaults source", () => {
   const now = Date.parse("2026-09-21T12:00:00.000Z");
   const payload = eventToPostPayload(
@@ -70,6 +83,72 @@ test("eventToPostPayload keeps fetched_at and explicit source", () => {
   assert.ok(typeof payload.created_at === "string");
 });
 
+test("eventToPostPayload maps Bernard display seed to API enums", () => {
+  const payload = eventToPostPayload({
+    channel: "growing-jobs",
+    title: "HVAC demand is climbing",
+    icon: "🔧",
+    tags: ["High School Students", "Apprenticeships", "Community College"],
+  });
+  assert.equal(payload.channel, "trade");
+  assert.deepEqual(payload.tags, ["high_school_students"]);
+  assert.equal(payload.emoji, "🔧");
+  assert.equal("icon" in payload, false);
+  assert.equal(payload.source, "synthetic");
+});
+
+test("eventToPostPayload maps every display channel and keeps API channels", () => {
+  assert.equal(eventToPostPayload({ channel: "growing-jobs", title: "x" }).channel, "trade");
+  assert.equal(eventToPostPayload({ channel: "ai-impact-alerts", title: "x" }).channel, "automation");
+  assert.equal(eventToPostPayload({ channel: "pay-updates", title: "x" }).channel, "community_college");
+  assert.equal(
+    eventToPostPayload({ channel: "pathway-comparison", title: "x" }).channel,
+    "apprenticeship"
+  );
+  assert.equal(eventToPostPayload({ channel: "skills-needed", title: "x" }).channel, "community_college");
+  assert.equal(eventToPostPayload({ channel: "university", title: "x" }).channel, "university");
+  assert.equal(eventToPostPayload({ channel: "trade", title: "x" }).channel, "trade");
+  assert.equal(eventToPostPayload({ channel: "automation", title: "x" }).channel, "automation");
+  assert.equal(
+    eventToPostPayload({ channel: "community_college", title: "x" }).channel,
+    "community_college"
+  );
+  assert.equal(eventToPostPayload({ channel: "apprenticeship", title: "x" }).channel, "apprenticeship");
+});
+
+test("eventToPostPayload maps display tags case-insensitively and drops unknowns", () => {
+  const payload = eventToPostPayload({
+    channel: "trade",
+    title: "x",
+    tags: [
+      "HIGH SCHOOL STUDENTS",
+      "College Students",
+      "parents",
+      "Career Counselors",
+      "Workforce Training Managers",
+      "Apprenticeships",
+      "high_school_students",
+    ],
+  });
+  assert.deepEqual(payload.tags, [
+    "high_school_students",
+    "college_students",
+    "parents",
+    "career_counselors",
+    "workforce_training_managers",
+  ]);
+});
+
+test("eventToPostPayload prefers emoji over icon", () => {
+  const payload = eventToPostPayload({
+    channel: "trade",
+    title: "x",
+    emoji: "⚡",
+    icon: "🔧",
+  });
+  assert.equal(payload.emoji, "⚡");
+});
+
 test("insightToPostPayload defaults source to synthetic", () => {
   assert.deepEqual(insightToPostPayload({ title: "ROI", value: "+6%", detail: "n" }), {
     title: "ROI",
@@ -77,6 +156,23 @@ test("insightToPostPayload defaults source to synthetic", () => {
     detail: "n",
     source: "synthetic",
   });
+});
+
+test("insightToPostPayload copies icon into detail when detail is missing", () => {
+  const payload = insightToPostPayload({ title: "ROI", value: "+6%", icon: "📈" });
+  assert.equal(payload.detail, "Icon: 📈");
+  assert.equal(payload.source, "synthetic");
+  assert.equal("icon" in payload, false);
+});
+
+test("insightToPostPayload keeps explicit detail when icon is also present", () => {
+  const payload = insightToPostPayload({
+    title: "ROI",
+    value: "+6%",
+    detail: "Keep a waitlist.",
+    icon: "📈",
+  });
+  assert.equal(payload.detail, "Keep a waitlist.");
 });
 
 test("successMessage names career trends and insights", () => {
