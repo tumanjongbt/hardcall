@@ -58,7 +58,8 @@ Direct `db.<ref>.supabase.co` may not resolve from some environments (Cloud Agen
 
 ```bash
 npm install
-npx tsc --noEmit   # optional typecheck
+npm run build      # required before migrate (compiled runner)
+npx tsc --noEmit   # optional extra typecheck
 npm run migrate    # applies migrations/001_events.sql once
 ```
 
@@ -111,12 +112,18 @@ Point the host at this repo, set `DATABASE_URL` (and `PORT` if the platform inje
 
 **Render**
 
+Render sets `NODE_ENV=production` during install, which omits `devDependencies`. `typescript`, `@types/node`, and `@types/pg` live in `dependencies` so `tsc` still runs. `npm run migrate` uses the compiled `dist/migrate.js` (no `tsx` at deploy time).
+
 1. New Web Service from this GitHub repo.
 2. Build: `npm ci && npm run build`
 3. Start: `npm start`
 4. Environment: `DATABASE_URL` = Neon or Supabase pooler URL.
 5. Release / pre-deploy command: `npm run migrate`
 6. Health check path: `/health`
+
+If you prefer to keep compilers in `devDependencies`, override the install with:
+
+`NPM_CONFIG_PRODUCTION=false npm ci && npm run build`
 
 **Railway**
 
