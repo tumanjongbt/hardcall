@@ -1,6 +1,7 @@
 -- Extend reserved live-source enums for Phase B/C adapters (ipeds, careeronestop,
 -- census, bea, fred). Public POST still cannot mint these — validators reject
--- them as reserved. Paste in the Supabase SQL editor after 006, then:
+-- them as reserved. Boot migrate applies this after 006. Paste in the
+-- Supabase SQL editor only if boot migrate failed, then:
 --   INSERT INTO schema_migrations (id) VALUES ('007_reserved_live_sources')
 --   ON CONFLICT (id) DO NOTHING;
 -- Neutral DDL (no product identifiers).

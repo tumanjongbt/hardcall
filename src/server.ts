@@ -3,6 +3,10 @@ import { createApp } from "./app";
 import { createPgStore, createPool } from "./db";
 import { allowDemoFromEnv } from "./demo_gate";
 import { createPgWarehouse } from "./ingest/warehouse";
+import {
+  applyPendingMigrations,
+  ensureInsightsProvenanceColumns,
+} from "./migrate";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {
@@ -31,7 +35,31 @@ async function shutdown(signal: string) {
 process.on("SIGINT", () => void shutdown("SIGINT"));
 process.on("SIGTERM", () => void shutdown("SIGTERM"));
 
-app.listen({ port, host }).catch((err) => {
+async function start() {
+  try {
+    const report = await applyPendingMigrations(pool);
+    app.log.info(
+      { applied: report.applied, skipped: report.skipped },
+      "schema migrations"
+    );
+  } catch (err) {
+    app.log.error(
+      err,
+      "full migrate failed (Render pooler or unapplied 006/007). Trying insight columns only; paste remaining SQL in Supabase if warehouse tables are still missing"
+    );
+  }
+  try {
+    await ensureInsightsProvenanceColumns(pool);
+  } catch (err) {
+    app.log.error(
+      err,
+      "could not ADD insights.source_url/fetched_at; GET /api/insights will use the pre-006 column fallback"
+    );
+  }
+  await app.listen({ port, host });
+}
+
+start().catch((err) => {
   console.error(err);
   process.exit(1);
 });

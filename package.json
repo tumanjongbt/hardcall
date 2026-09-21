@@ -14,7 +14,7 @@
     "dev": "tsx watch src/server.ts",
     "dev:memory": "tsx src/dev_memory_server.ts",
     "migrate": "node dist/migrate.js",
-    "test": "node src/events_validate.test.js && node src/insights_validate.test.js && tsx --test src/app.test.ts src/sse_hub.test.ts src/demo_gate.test.ts src/live_sources.test.ts src/ingest/*.test.ts && npm --prefix cli test && npm --prefix dashboard test"
+    "test": "node src/events_validate.test.js && node src/insights_validate.test.js && tsx --test src/app.test.ts src/sse_hub.test.ts src/demo_gate.test.ts src/live_sources.test.ts src/db.test.ts src/migrate.test.ts src/ingest/*.test.ts && npm --prefix cli test && npm --prefix dashboard test"
   },
   "dependencies": {
     "@types/node": "^22.18.6",

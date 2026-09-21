@@ -2,6 +2,10 @@ import "dotenv/config";
 import { parseArgs } from "node:util";
 import { createPool } from "../db";
 import { allowDemoFromEnv } from "../demo_gate";
+import {
+  applyPendingMigrations,
+  ensureInsightsProvenanceColumns,
+} from "../migrate";
 import { runIngest, type IngestSource } from "./run";
 import { createPgWarehouse } from "./warehouse";
 
@@ -85,6 +89,25 @@ async function main(argv = process.argv.slice(2)): Promise<number> {
 
   const pool = process.env.DATABASE_URL ? createPool(process.env.DATABASE_URL) : null;
   try {
+    if (pool && !dryRun) {
+      try {
+        const migrations = await applyPendingMigrations(pool);
+        process.stdout.write(
+          `migrate applied=${migrations.applied.join(",") || "none"} skipped=${migrations.skipped.length}\n`
+        );
+      } catch (err) {
+        process.stderr.write(
+          `warning: full migrate failed: ${err instanceof Error ? err.message : String(err)}\n`
+        );
+        try {
+          await ensureInsightsProvenanceColumns(pool);
+        } catch (ensureErr) {
+          process.stderr.write(
+            `warning: insight provenance columns: ${ensureErr instanceof Error ? ensureErr.message : String(ensureErr)}\n`
+          );
+        }
+      }
+    }
     const report = await runIngest({
       source,
       file: values.file,
