@@ -28,6 +28,8 @@ Reject unknown top-level keys (400). Server sets `id`, `created_at`.
 
 ## Responses
 
+After a successful insert the same row is broadcast on `GET /api/events/stream` (see that contract).
+
 **201 Created**
 
 ```json

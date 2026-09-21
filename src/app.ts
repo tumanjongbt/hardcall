@@ -1,6 +1,10 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import { validateCreateEvent } from "./events_validate";
+import { createSseHub, type SseHub } from "./sse_hub";
 import type { EventStore } from "./types";
+
+const SSE_HEARTBEAT_MS = 15_000;
+const SSE_RETRY_MS = 5_000;
 
 function isJsonContentType(value: string | undefined): boolean {
   if (!value) return false;
@@ -22,9 +26,15 @@ function isParserError(err: unknown): boolean {
 
 export function createApp(
   store: EventStore,
-  opts?: { logger?: boolean }
+  opts?: { logger?: boolean; hub?: SseHub; heartbeatMs?: number }
 ): FastifyInstance {
-  const app = Fastify({ logger: opts?.logger ?? false });
+  const app = Fastify({
+    logger: opts?.logger ?? false,
+    requestTimeout: 0,
+    connectionTimeout: 0,
+  });
+  const hub = opts?.hub ?? createSseHub();
+  const heartbeatMs = opts?.heartbeatMs ?? SSE_HEARTBEAT_MS;
 
   app.setErrorHandler((err, _request, reply) => {
     if (isParserError(err)) {
@@ -35,6 +45,40 @@ export function createApp(
   });
 
   app.get("/health", async () => ({ ok: true }));
+
+  app.get("/api/events/stream", (request, reply) => {
+    reply.hijack();
+    const raw = reply.raw;
+    if (!raw.headersSent) {
+      raw.writeHead(200, {
+        "Content-Type": "text/event-stream; charset=utf-8",
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive",
+        "X-Accel-Buffering": "no",
+        "Access-Control-Allow-Origin": "*",
+      });
+    }
+    raw.write(`retry: ${SSE_RETRY_MS}\n\n`);
+    raw.write(": connected\n\n");
+
+    const unsubscribe = hub.subscribe({
+      write: (chunk) => raw.write(chunk),
+    });
+
+    const heartbeat = setInterval(() => {
+      raw.write(": keepalive\n\n");
+    }, heartbeatMs);
+    heartbeat.unref();
+
+    const cleanup = () => {
+      clearInterval(heartbeat);
+      unsubscribe();
+    };
+    raw.on("close", cleanup);
+    raw.on("error", cleanup);
+    request.raw.on("close", cleanup);
+    request.raw.on("error", cleanup);
+  });
 
   app.post("/api/events", async (request, reply) => {
     if (!isJsonContentType(request.headers["content-type"])) {
@@ -51,6 +95,7 @@ export function createApp(
 
     try {
       const row = await store.insertEvent(parsed.value);
+      hub.broadcast(row);
       return reply.code(201).send(row);
     } catch (err) {
       request.log.error(err);
