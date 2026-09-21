@@ -94,7 +94,7 @@ function upsert(
   if (existing) {
     existing.data.labels = config.data.labels;
     existing.data.datasets = config.data.datasets;
-    existing.update();
+    existing.update("none");
     return existing;
   }
   const chart = new Chart(canvas, config);
@@ -151,7 +151,7 @@ function lineConfig(buckets: DayBucket[]): ChartConfiguration<"line"> {
 }
 
 function doughnutConfig(data: ChartData): ChartConfiguration<"doughnut"> {
-  const slices = data.distribution;
+  const slices = data.distribution.filter((slice) => slice.count > 0);
   return {
     type: "doughnut",
     data: {
