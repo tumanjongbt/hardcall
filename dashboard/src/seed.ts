@@ -1,7 +1,29 @@
+import { TAGS, isChannel, type Channel, type StakeholderTag } from "./channels";
+
 export type SeedFile = {
   events: Record<string, unknown>[];
   insights: Record<string, unknown>[];
 };
+
+/** Bernard display-channel slugs → POST /api/events enums. */
+const SEED_DISPLAY_CHANNELS: Record<string, Channel> = {
+  "growing-jobs": "trade",
+  "ai-impact-alerts": "automation",
+  "pay-updates": "community_college",
+  "pathway-comparison": "apprenticeship",
+  "skills-needed": "community_college",
+};
+
+/** Case-insensitive display labels → stakeholder tag enums. */
+const SEED_DISPLAY_TAGS: Record<string, StakeholderTag> = {
+  "high school students": "high_school_students",
+  "college students": "college_students",
+  parents: "parents",
+  "career counselors": "career_counselors",
+  "workforce training managers": "workforce_training_managers",
+};
+
+const API_TAGS = new Set<string>(TAGS);
 
 export type SeedProgress = {
   running: boolean;
@@ -70,6 +92,50 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
+function presentString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value : undefined;
+}
+
+/** Map seed display channel (or already-valid API enum) to POST body channel. */
+function mapSeedChannel(raw: unknown): unknown {
+  if (typeof raw !== "string") return raw;
+  const trimmed = raw.trim();
+  if (isChannel(trimmed)) return trimmed;
+  return SEED_DISPLAY_CHANNELS[trimmed] ?? trimmed;
+}
+
+/** Map one seed tag; unknown labels (Apprenticeships, Community College, …) drop. */
+function mapSeedTag(raw: string): StakeholderTag | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const lower = trimmed.toLowerCase();
+  if (API_TAGS.has(lower)) return lower as StakeholderTag;
+  return SEED_DISPLAY_TAGS[lower] ?? null;
+}
+
+/** Keep valid API tags / mapped display labels; drop the rest. Dedupes. */
+function mapSeedTags(raw: unknown): unknown {
+  if (!Array.isArray(raw)) return raw;
+  const seen = new Set<string>();
+  const tags: StakeholderTag[] = [];
+  for (const item of raw) {
+    if (typeof item !== "string") continue;
+    const mapped = mapSeedTag(item);
+    if (!mapped || seen.has(mapped)) continue;
+    seen.add(mapped);
+    tags.push(mapped);
+  }
+  return tags;
+}
+
+/** Prefer emoji; if missing, copy icon onto emoji. */
+function seedEmoji(raw: Record<string, unknown>): unknown | undefined {
+  if (presentString(raw.emoji) !== undefined) return raw.emoji;
+  if (presentString(raw.icon) !== undefined) return raw.icon;
+  if (raw.emoji !== undefined) return raw.emoji;
+  return undefined;
+}
+
 function itemTitle(raw: Record<string, unknown>, fallback: string): string {
   return typeof raw.title === "string" && raw.title.trim() ? raw.title.trim() : fallback;
 }
@@ -80,11 +146,12 @@ export function eventToPostPayload(
   now = Date.now()
 ): Record<string, unknown> {
   const payload: Record<string, unknown> = {};
-  if (raw.channel !== undefined) payload.channel = raw.channel;
+  if (raw.channel !== undefined) payload.channel = mapSeedChannel(raw.channel);
   if (raw.title !== undefined) payload.title = raw.title;
   if (raw.description !== undefined) payload.description = raw.description;
-  if (raw.emoji !== undefined) payload.emoji = raw.emoji;
-  if (raw.tags !== undefined) payload.tags = raw.tags;
+  const emoji = seedEmoji(raw);
+  if (emoji !== undefined) payload.emoji = emoji;
+  if (raw.tags !== undefined) payload.tags = mapSeedTags(raw.tags);
   if (raw.source_url !== undefined) payload.source_url = raw.source_url;
   if (raw.fetched_at !== undefined) payload.fetched_at = raw.fetched_at;
   payload.source =
@@ -103,7 +170,14 @@ export function insightToPostPayload(raw: Record<string, unknown>): Record<strin
   const payload: Record<string, unknown> = {};
   if (raw.title !== undefined) payload.title = raw.title;
   if (raw.value !== undefined) payload.value = raw.value;
-  if (raw.detail !== undefined) payload.detail = raw.detail;
+  const detail = presentString(raw.detail);
+  if (detail !== undefined) {
+    payload.detail = raw.detail;
+  } else if (presentString(raw.icon) !== undefined) {
+    payload.detail = `Icon: ${raw.icon}`;
+  } else if (raw.detail !== undefined) {
+    payload.detail = raw.detail;
+  }
   payload.source =
     typeof raw.source === "string" && raw.source.trim() ? raw.source.trim() : "synthetic";
   return payload;
