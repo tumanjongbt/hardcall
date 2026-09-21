@@ -295,8 +295,10 @@ function renderKpiCard(
   const open = openId === insight.id;
   card.setAttribute("aria-expanded", open ? "true" : "false");
   if (open) card.classList.add("is-open");
-  card.append(sourceBadgeEl(insightSourceBadge(insight.source)));
-  card.append(el("p", "kpi-card__title", insight.title));
+  const head = el("div", "kpi-card__head");
+  head.append(sourceBadgeEl(insightSourceBadge(insight.source)));
+  head.append(el("p", "kpi-card__title", insight.title));
+  card.append(head);
   card.append(el("p", "kpi-card__value", insight.value));
   const time = el("time", "kpi-card__when", `Updated ${formatWhen(insight.updated_at)}`);
   time.dateTime = insight.updated_at;
