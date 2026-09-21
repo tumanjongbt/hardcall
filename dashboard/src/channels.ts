@@ -32,6 +32,9 @@ export const TAGS = [
   "workforce_training_managers",
 ] as const;
 
+/** Alias used by Charts transforms. */
+export const STAKEHOLDER_TAGS = TAGS;
+
 export type StakeholderTag = (typeof TAGS)[number];
 
 export const TAG_LABELS: Record<StakeholderTag, string> = {
@@ -41,16 +44,6 @@ export const TAG_LABELS: Record<StakeholderTag, string> = {
   career_counselors: "Career counselors",
   workforce_training_managers: "Workforce training managers",
 };
-
-export const STAKEHOLDER_TAGS = [
-  "high_school_students",
-  "college_students",
-  "parents",
-  "career_counselors",
-  "workforce_training_managers",
-] as const;
-
-export type StakeholderTag = (typeof STAKEHOLDER_TAGS)[number];
 
 export const AUDIENCE_LENSES = [
   "students",
