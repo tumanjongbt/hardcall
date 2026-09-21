@@ -251,7 +251,7 @@ After deploy, `GET https://<host>/health` should return `{ "ok": true }`. Then P
 
 See `dashboard/README.md` for the full checklist. Short version:
 
-- Celestial brand lives in the dashboard only (tokens, Unbounded / DM Sans / IBM Plex Mono, `public/logo.png`, `public/banner-celestial.png`). Keep `hardcall` out of routes, DDL, and status enums.
+- Celestial brand lives in the dashboard only (see `BRAND.md`). Tokens, Unbounded / DM Sans / IBM Plex Mono, locked celestial-map mark (`dashboard/public/logo.png`) and hero (`dashboard/public/banner-celestial.png`). Do not ship event-horizon, supernova, protostar, or the old geometric amber H. Keep `hardcall` out of routes, DDL, and status enums.
 - **Render free** does not run `npm run migrate` on deploy. Paste new `migrations/*.sql` in Supabase and record the stem in `schema_migrations`, then redeploy the web service. Paid Render / Railway / Fly can use the release command.
 
 ## Out of scope (later)
