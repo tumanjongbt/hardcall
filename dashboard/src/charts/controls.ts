@@ -4,15 +4,19 @@ import {
   CHANNEL_LABELS,
   LENS_LABELS,
 } from "../channels";
-import type { AudienceLens, ChartRange, ForecastHorizon, ViewState } from "../types";
-import { comparePairLabel, lensHint, NON_ADVISORY } from "./copy";
-import { FORECAST_HORIZONS, RANGE_PRESETS } from "./transforms";
+import type { AudienceLens, ChartRange, ViewState } from "../types";
+import { comparePairLabel, lensHint } from "./copy";
+import { RANGE_PRESETS } from "./transforms";
 
 export type ChartFilterHandlers = {
   onLens: (lens: AudienceLens | null) => void;
   onRange: (range: ChartRange) => void;
-  onForecast: (horizon: ForecastHorizon) => void;
   onToggleCompare: (channel: string) => void;
+};
+
+export type ChartFilterMeta = {
+  /** In-window event counts per channel. Missing means “don’t disable”. */
+  volumes?: Record<string, number>;
 };
 
 function el<K extends keyof HTMLElementTagNameMap>(
@@ -30,12 +34,18 @@ function chip(
   label: string,
   pressed: boolean,
   onClick: () => void,
-  extraClass = ""
+  extraClass = "",
+  options: { disabled?: boolean; title?: string } = {}
 ): HTMLButtonElement {
   const button = el("button", `chip chip--compact ${extraClass}`.trim(), label);
   button.type = "button";
   button.setAttribute("aria-pressed", pressed ? "true" : "false");
   if (pressed) button.classList.add("is-active");
+  if (options.disabled) {
+    button.disabled = true;
+    button.setAttribute("aria-disabled", "true");
+  }
+  if (options.title) button.title = options.title;
   button.addEventListener("click", onClick);
   return button;
 }
@@ -43,15 +53,11 @@ function chip(
 export function renderChartFilters(
   root: HTMLElement,
   view: ViewState,
-  handlers: ChartFilterHandlers
+  handlers: ChartFilterHandlers,
+  meta: ChartFilterMeta = {}
 ): void {
   root.replaceChildren();
   root.classList.add("chart-filters");
-
-  const advisory = el("p", "non-advisory");
-  advisory.setAttribute("role", "note");
-  advisory.append(el("span", "non-advisory__chip", "Not advice"));
-  advisory.append(el("span", "non-advisory__text", NON_ADVISORY));
 
   const lensField = el("fieldset", "chart-filter");
   const lensLegend = el("legend", "control-label", "Audience lens");
@@ -68,12 +74,11 @@ export function renderChartFilters(
     button.setAttribute("aria-checked", view.lens === lens ? "true" : "false");
     lensRow.append(button);
   }
-  const lensNote = el(
-    "p",
-    "chart-filter__hint",
-    lensHint(view.lens ? LENS_LABELS[view.lens] : "All")
-  );
-  lensField.append(lensLegend, lensRow, lensNote);
+  lensField.append(lensLegend, lensRow);
+  const hint = lensHint(view.lens ? LENS_LABELS[view.lens] : "All");
+  if (hint) {
+    lensField.append(el("p", "chart-filter__hint", hint));
+  }
 
   const rangeField = el("fieldset", "chart-filter");
   const rangeLegend = el("legend", "control-label", "Time range");
@@ -89,29 +94,6 @@ export function renderChartFilters(
   }
   rangeField.append(rangeLegend, rangeRow);
 
-  const forecastField = el("fieldset", "chart-filter");
-  const forecastLegend = el("legend", "control-label", "Forecast horizon");
-  forecastLegend.id = "forecast-label";
-  const forecastRow = el("div", "chip-row");
-  forecastRow.setAttribute("role", "radiogroup");
-  forecastRow.setAttribute("aria-labelledby", "forecast-label");
-  for (const days of FORECAST_HORIZONS) {
-    const button = chip(
-      `${days}-day band`,
-      view.forecast === days,
-      () => handlers.onForecast(days)
-    );
-    button.dataset.forecast = String(days);
-    button.setAttribute("aria-checked", view.forecast === days ? "true" : "false");
-    forecastRow.append(button);
-  }
-  const forecastNote = el(
-    "p",
-    "chart-filter__hint",
-    "Projection only — the Not-advice chip cannot be dismissed."
-  );
-  forecastField.append(forecastLegend, forecastRow, forecastNote);
-
   const compareField = el("fieldset", "chart-filter");
   const compareLegend = el("legend", "control-label", "Path compare");
   compareLegend.id = "compare-label";
@@ -121,11 +103,18 @@ export function renderChartFilters(
   compareRow.setAttribute("aria-multiselectable", "true");
   for (const channel of CHANNELS) {
     const selected = view.compare.includes(channel);
+    const volume = meta.volumes?.[channel];
+    const empty = volume === 0;
     const button = chip(
       CHANNEL_LABELS[channel],
       selected,
       () => handlers.onToggleCompare(channel),
-      `chip--${channel}`
+      `chip--${channel}`,
+      empty && !selected
+        ? { disabled: true, title: "No events in this window" }
+        : empty
+          ? { title: "No events in this window" }
+          : {}
     );
     button.dataset.compareChannel = channel;
     compareRow.append(button);
@@ -133,5 +122,5 @@ export function renderChartFilters(
   const compareNote = el("p", "chart-filter__hint", comparePairLabel(view.compare));
   compareField.append(compareLegend, compareRow, compareNote);
 
-  root.append(advisory, lensField, rangeField, forecastField, compareField);
+  root.append(lensField, rangeField, compareField);
 }

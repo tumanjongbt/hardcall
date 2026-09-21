@@ -86,15 +86,16 @@ The new card should slide/flash in at the top of page 1 when it matches the curr
 
 6. **Charts tab (counselor workflow)** — open `?tab=charts`. You should see:
 
-   - A mandatory **Not advice** chip (cannot be dismissed). The 14/30-day forecast band is telemetry, not a path recommendation.
+   - A one-line **decision statement** under the Charts title: which path is drawing signal, and is automation pressure rising?
+   - Shared Events **channel chips + 300ms search**, then primary controls only: **Audience lens**, **Time range**, **Path compare** (two channels).
+   - **Activity + forecast** and **Path compare** at the top of the viz stack, then a compact **so-what** table. Secondary mix / resilience / heat / per-path bars stay behind a closed **More views** disclosure.
+   - A mandatory **Not advice** chip on the forecast (cannot be dismissed). Horizon chips (14/30) live on the activity card and write `forecast=`.
    - **Audience lens** (All / Students / Parents / Counselors / Workforce) — Students unions `high_school_students` + `college_students`. URL writes `lens=`.
-   - **Time range** 7 / 14 / 30 / **90** days (default 30). All time-series, the stacked mix, heat, ranks, and the forecast input recompute. URL writes `range=`.
-   - **Forecast horizon** 14- or 30-day band overlaid on the activity line. URL writes `forecast=`.
-   - **Path compare** — select two channels (default Trade vs University). Dual-series line answers “which path is drawing more signal right now?”
-   - Existing line / doughnut / per-channel bars, plus stacked composition, stakeholder bars, automation-resilience split, weekday heat, and a data view with volume, share, DoD/WoW, and a one-line **so what**.
-   - Change lens, range, channel, or search: after 300ms every chart **and** the data view update together. Share the URL.
+   - **Time range** 7 / 14 / 30 / **90** days (default 30). URL writes `range=`.
+   - **Path compare** — select two channels (default Trade vs University). If both selected paths have zero events in the filtered window, the card says **No data for selected paths** (never a 0–0 tie). Empty path chips disable.
+   - Change lens, range, channel, or search: after 300ms every visible chart **and** the data view update together. Share the URL. Below 600px, chart cards stay fluid-width with no page-level horizontal scroll.
 
-   Counselor recipe: set lens to **Students** (or **Parents**), range **30** (or **90** if you need the long hist), compare **Trade vs University**, and read the data-view “so what” before the family meeting. Treat automation resilience as a check on displacement risk, not a verdict.
+   Counselor recipe: set lens to **Students** (or **Parents**), range **30** (or **90** if you need the long hist), compare **Trade vs University**, and read the path-snapshot “so what” before the family meeting. Open **More views** only when you need mix, resilience, or weekday intensity.
 
 7. **Market Insights tab** — switch to Market Insights (`?tab=insights`). KPI cards should appear (empty until `POST /api/insight`). Click a card: the drawer shows title, KPI value, and `detail` (or “No analysis yet for this insight.”). Esc / Close returns to the grid. Reload `?tab=insights&insight=<id>` should reopen that tile. Wait ~15s or POST a new/updated title and confirm the grid refreshes on the next poll without closing an open drawer.
 

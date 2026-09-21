@@ -13,6 +13,7 @@ import {
   dailyActivity,
   eventsInRange,
   formatDeltaLabel,
+  compareIsEmpty,
   detectSpikes,
   forecastBand,
   futureDayKeys,
@@ -253,6 +254,15 @@ test("pathCompare dual series answers which path is drawing more signal", () => 
   assert.equal(compare.leader, "trade");
   assert.equal(pathCompare(rows, now, 7, ["trade"]), null);
   assert.equal(pathCompare(rows, now, 7, ["trade", "trade"]), null);
+  assert.equal(compareIsEmpty(compare), false);
+  const emptyPair = pathCompare(
+    rows.filter((item) => item.channel === "automation"),
+    now,
+    7,
+    ["trade", "university"]
+  );
+  assert.equal(compareIsEmpty(emptyPair), true);
+  assert.equal(compareIsEmpty(null), false);
 });
 
 test("formatDeltaLabel covers flat, new, and percent change", () => {

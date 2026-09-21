@@ -1,6 +1,8 @@
 import { fetchEvents, fetchInsights, postEvent, subscribeEvents } from "./api";
+import { DECISION_LINE } from "./charts/copy";
 import { renderCharts, teardownCharts } from "./charts/renderCharts";
 import { renderChartFilters } from "./charts/controls";
+import { channelDistribution, eventsInRange } from "./charts/transforms";
 import { apiBase, INSIGHTS_POLL_MS, PLAYGROUND_TOAST_MS, SEARCH_DEBOUNCE_MS } from "./config";
 import { debounce } from "./debounce";
 import { findInsight } from "./insights";
@@ -42,6 +44,8 @@ import { hrefForState, parseViewState } from "./url-state";
 const tabsEl = must("#tabs");
 const eventsViewEl = must("#events-view");
 const chartsViewEl = must("#charts-view");
+const chartsHeadingEl = must("#charts-heading");
+const chartsDecisionEl = must("#charts-decision");
 const chartFiltersEl = must("#chart-filters");
 const chartsEl = must("#charts");
 const insightsViewEl = must("#insights-view");
@@ -135,6 +139,8 @@ function paint(): void {
   renderTabs(tabsEl, model.view.tab, setTab);
   eventsViewEl.hidden = model.view.tab !== "events";
   chartsViewEl.hidden = model.view.tab !== "charts";
+  chartsHeadingEl.hidden = model.view.tab !== "charts";
+  chartsDecisionEl.textContent = DECISION_LINE;
   insightsViewEl.hidden = model.view.tab !== "insights";
   playgroundViewEl.hidden = model.view.tab !== "playground";
   eventFiltersEl.hidden =
@@ -147,18 +153,33 @@ function paint(): void {
   renderFeed(feedEl, model);
   renderPagination(paginationEl, model, setPage);
   if (model.view.tab === "charts") {
-    renderChartFilters(chartFiltersEl, model.view, {
-      onLens: setLens,
-      onRange: setRange,
-      onForecast: setForecast,
-      onToggleCompare: toggleCompare,
-    });
-    renderCharts(chartsEl, {
-      events: model.chartFiltered,
-      view: model.view,
-      loading: model.loading,
-      loadError: model.loadError,
-    });
+    const now = new Date();
+    const volumes = Object.fromEntries(
+      channelDistribution(
+        eventsInRange(model.chartFiltered, now, model.view.range)
+      ).map((slice) => [slice.channel, slice.count])
+    );
+    renderChartFilters(
+      chartFiltersEl,
+      model.view,
+      {
+        onLens: setLens,
+        onRange: setRange,
+        onToggleCompare: toggleCompare,
+      },
+      { volumes: model.loading ? undefined : volumes }
+    );
+    renderCharts(
+      chartsEl,
+      {
+        events: model.chartFiltered,
+        view: model.view,
+        loading: model.loading,
+        loadError: model.loadError,
+      },
+      now,
+      { onForecast: setForecast }
+    );
   } else {
     teardownCharts(chartsEl);
   }
