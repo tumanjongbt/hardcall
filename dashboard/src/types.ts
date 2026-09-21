@@ -12,6 +12,7 @@ export type InsightRow = {
   id: string;
   title: string;
   value: string;
+  detail: string;
   created_at: string;
   updated_at: string;
 };
@@ -26,6 +27,7 @@ export type ViewState = {
   perPage: PerPage;
   channel: string | null;
   q: string;
+  insight: string | null;
 };
 
 export type StreamStatus = "connecting" | "live" | "down";

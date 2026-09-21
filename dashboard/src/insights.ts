@@ -17,3 +17,19 @@ export function sortInsights(rows: InsightRow[]): InsightRow[] {
     return byTime !== 0 ? byTime : a.title.localeCompare(b.title);
   });
 }
+
+export function findInsight(rows: InsightRow[], id: string | null): InsightRow | null {
+  if (!id) return null;
+  return rows.find((row) => row.id === id) ?? null;
+}
+
+export const EMPTY_INSIGHT_DETAIL = "No analysis yet for this insight.";
+
+export function insightDetailBody(detail: string | null | undefined): {
+  empty: boolean;
+  text: string;
+} {
+  const text = (detail ?? "").trim();
+  if (!text) return { empty: true, text: EMPTY_INSIGHT_DETAIL };
+  return { empty: false, text };
+}

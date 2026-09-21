@@ -378,7 +378,17 @@ body {
   gap: 14px;
 }
 
+.kpi-grid__item {
+  margin: 0;
+}
+
 .kpi-card {
+  appearance: none;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
   background: color-mix(in srgb, #14082a 78%, var(--void));
   border: 1px solid var(--line);
   border-radius: 18px;
@@ -388,6 +398,21 @@ body {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.kpi-card:hover,
+.kpi-card:focus-visible {
+  border-color: color-mix(in srgb, var(--nebula) 70%, var(--paper));
+  outline: none;
+}
+
+.kpi-card:focus-visible {
+  box-shadow: 0 0 0 2px var(--corona), var(--shadow);
+}
+
+.kpi-card.is-open {
+  border-color: var(--nebula);
+  box-shadow: 0 0 0 1px var(--nebula), var(--shadow);
 }
 
 .kpi-card--up {
@@ -431,6 +456,86 @@ body {
   font-size: 0.82rem;
 }
 
+body.has-insight-detail {
+  overflow: hidden;
+}
+
+.insight-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  justify-content: flex-end;
+  background: color-mix(in srgb, var(--void) 58%, transparent);
+}
+
+.insight-drawer {
+  width: min(440px, 100%);
+  height: 100%;
+  overflow: auto;
+  background: var(--card);
+  border-left: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  padding: 28px 24px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.insight-drawer__close {
+  appearance: none;
+  align-self: flex-end;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--void) 40%, transparent);
+  color: var(--paper);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font: inherit;
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.insight-drawer__close:hover,
+.insight-drawer__close:focus-visible {
+  border-color: color-mix(in srgb, var(--nebula) 70%, var(--paper));
+  outline: none;
+}
+
+.insight-drawer__title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--paper-dim);
+}
+
+.insight-drawer__value {
+  margin: 0;
+  font-size: clamp(1.8rem, 4vw, 2.4rem);
+  font-weight: 650;
+  color: var(--corona);
+  line-height: 1.1;
+}
+
+.insight-drawer__when {
+  color: var(--paper-dim);
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-size: 0.82rem;
+}
+
+.insight-drawer__detail {
+  margin: 8px 0 0;
+  white-space: pre-wrap;
+  color: color-mix(in srgb, var(--paper) 88%, var(--void));
+}
+
+.insight-drawer__detail.is-empty {
+  color: var(--paper-dim);
+  font-style: italic;
+}
+
 .footnote {
   margin-top: 28px;
   color: var(--paper-dim);
@@ -451,5 +556,9 @@ body {
   .event-card__top {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .insight-drawer {
+    width: 100%;
   }
 }

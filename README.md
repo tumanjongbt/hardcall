@@ -4,7 +4,7 @@ Real-time career intelligence pipeline — education ROI and automation resilien
 
 Tagline: *the call that shapes your orbit.*
 
-Phase 1 is the always-on ingest API and cloud Postgres store. Scrapers and data sources `POST /api/events`. Phase 1.5 adds a live SSE stream and a standalone `events` CLI. Phase 2 adds `GET /api/events` (history) and a local dashboard that filters, searches, paginates, and stays on the live stream. Market Insights adds `insights` KPI upserts (`POST /api/insight`) and a 15-second dashboard poll (`GET /api/insights`).
+Phase 1 is the always-on ingest API and cloud Postgres store. Scrapers and data sources `POST /api/events`. Phase 1.5 adds a live SSE stream and a standalone `events` CLI. Phase 2 adds `GET /api/events` (history) and a local dashboard that filters, searches, paginates, and stays on the live stream. Market Insights adds `insights` KPI upserts (`POST /api/insight`) and a 15-second dashboard poll (`GET /api/insights`). Clicking a KPI card opens that topic’s analysis (`detail`).
 
 ## What ships
 
@@ -12,6 +12,7 @@ Phase 1 is the always-on ingest API and cloud Postgres store. Scrapers and data 
 | --- | --- |
 | Protostar migration | `migrations/001_events.sql` |
 | Insights migration | `migrations/002_insights.sql` |
+| Insight detail migration | `migrations/003_insights_detail.sql` |
 | Orion request validation | `src/events_validate.js`, `src/insights_validate.js` |
 | HTTP contracts | `contracts/POST_api_events.md`, `contracts/GET_api_events.md`, `contracts/GET_api_events_stream.md`, `contracts/POST_api_insight.md`, `contracts/GET_api_insights.md` |
 | TypeScript API | `src/app.ts`, `src/server.ts`, `src/sse_hub.ts` |
@@ -32,7 +33,7 @@ Required: `channel`, `title`. Optional: `description`, `emoji`, `tags`. Server s
 
 ## Insight shape
 
-Required: `title`, `value`. Both trimmed strings. Exact `title` is the upsert key (unique). Server sets `id`, `created_at`, `updated_at`. A later POST with the same title updates `value` and `updated_at` only.
+Required: `title`, `value`. Optional: `detail` (analysis body, trim, max 8000). Exact `title` is the upsert key (unique). Server sets `id`, `created_at`, `updated_at`. A later POST with the same title updates `value` and `updated_at`. If `detail` is omitted on update, the stored analysis is kept (not wiped). New titles with no `detail` store `""`.
 
 ## `DATABASE_URL` (Neon or Supabase)
 
@@ -70,7 +71,20 @@ npx tsc --noEmit   # optional extra typecheck
 npm run migrate    # applies pending files in migrations/ (001_events, 002_insights, …)
 ```
 
-`schema_migrations` records each file stem (`001_events`, `002_insights`) so the runner is idempotent. Re-running skips already-applied files. Same release command as events: Render / Railway run `npm run migrate` on deploy (not on every API boot). After this branch merges, **redeploy the Render web service** so the new routes ship and `002_insights` applies against Supabase.
+`schema_migrations` records each file stem (`001_events`, `002_insights`, `003_insights_detail`) so the runner is idempotent. Re-running skips already-applied files. Railway can still run `npm run migrate` on deploy. **Render free-tier does not run a release/pre-deploy migrate** — after merge, Bernard must paste the new SQL in the Supabase SQL editor (same as `002_insights.sql`), then record the stem so a later runner skips it:
+
+```sql
+-- 1. Paste the full contents of migrations/003_insights_detail.sql
+-- 2. Then:
+INSERT INTO schema_migrations (id) VALUES ('003_insights_detail')
+ON CONFLICT (id) DO NOTHING;
+```
+
+After that, redeploy the Render web service so the new `detail` field is on `POST /api/insight` and `GET /api/insights`. Then seed analysis bodies (exact titles already in prod):
+
+```bash
+EVENTS_API_URL=https://hardcall-api.onrender.com node scripts/seed-insight-details.js
+```
 
 The migration creates `events` plus:
 
@@ -92,8 +106,8 @@ npm run build && npm start
 - `POST /api/events` → `201` + stored row, or `400` / `415` / `500` per the contract
 - `GET /api/events` → `{ "events": [...] }` newest-first (`created_at DESC`, `id DESC`); optional `?channel=` and `?limit=` (default/max 1000)
 - `GET /api/events/stream` → SSE (`text/event-stream`); each new insert is an SSE `message` whose JSON matches the stored row
-- `POST /api/insight` → `201` insert or `200` exact-title upsert; body `{ "title", "value" }`; `400` / `415` / `500` same posture as events
-- `GET /api/insights` → `{ "insights": [...] }` ordered by `updated_at DESC`, then `title ASC`
+- `POST /api/insight` → `201` insert or `200` exact-title upsert; body `{ "title", "value", "detail?" }`; omitted `detail` on update keeps the stored body; `400` / `415` / `500` same posture as events
+- `GET /api/insights` → `{ "insights": [{ id, title, value, detail, created_at, updated_at }] }` ordered by `updated_at DESC`, then `title ASC`
 
 ```bash
 curl -sS http://127.0.0.1:3000/health
@@ -103,7 +117,7 @@ curl -sS http://127.0.0.1:3000/api/insights
 
 curl -sS -X POST http://127.0.0.1:3000/api/insight \
   -H 'Content-Type: application/json' \
-  -d '{ "title": "Top Trade Income Growth", "value": "+18%" }'
+  -d '{ "title": "Top Trade Income Growth", "value": "+18%", "detail": "Electricians and HVAC still lead wage growth." }'
 
 curl -sS -X POST http://127.0.0.1:3000/api/events \
   -H 'Content-Type: application/json' \
@@ -163,7 +177,7 @@ cd dashboard
 VITE_EVENTS_API_URL=http://127.0.0.1:3000 npm run dev
 ```
 
-The Events tab stays reverse-chronological, listens on SSE, filters by channel, debounces search by 300ms, paginates (50 / 100 / all), and writes `page`, `perPage`, `channel`, and `q` into the URL for bookmarking. The Market Insights tab polls `GET /api/insights` on mount and every **15 seconds** (`?tab=insights`).
+The Events tab stays reverse-chronological, listens on SSE, filters by channel, debounces search by 300ms, paginates (50 / 100 / all), and writes `page`, `perPage`, `channel`, and `q` into the URL for bookmarking. The Market Insights tab polls `GET /api/insights` on mount and every **15 seconds** (`?tab=insights`). Click a KPI card to open that topic’s analysis (Esc or Close returns to the grid). Counselors can deep-link `?tab=insights&insight=<id>`.
 
 ### `events` CLI
 
@@ -205,7 +219,7 @@ Render sets `NODE_ENV=production` during install, which omits `devDependencies`.
 2. Build: `npm ci && npm run build`
 3. Start: `npm start`
 4. Environment: `DATABASE_URL` = Neon or Supabase pooler URL.
-5. Release / pre-deploy command: `npm run migrate`
+5. Release / pre-deploy command: `npm run migrate` (Render **free** often cannot run this — paste new SQL in the Supabase SQL editor instead, same as `002` / `003`)
 6. Health check path: `/health`
 
 If you prefer to keep compilers in `devDependencies`, override the install with:

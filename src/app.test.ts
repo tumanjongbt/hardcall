@@ -43,6 +43,7 @@ function memoryStore(
       const now = "2026-09-21T12:00:00.000Z";
       if (existing) {
         existing.value = value.value;
+        if (value.detail !== undefined) existing.detail = value.detail;
         existing.updated_at = now;
         return { row: { ...existing }, created: false };
       }
@@ -50,6 +51,7 @@ function memoryStore(
         id: "660e8400-e29b-41d4-a716-446655440000",
         title: value.title,
         value: value.value,
+        detail: value.detail ?? "",
         created_at: now,
         updated_at: now,
       };
@@ -510,6 +512,7 @@ const insightSeed: InsightRow[] = [
     id: "00000000-0000-4000-8000-000000000011",
     title: "University 4-year ROI",
     value: "+6%",
+    detail: "Four-year ROI is still positive in this metro, but slower than short paths.",
     created_at: "2026-09-20T10:00:00.000Z",
     updated_at: "2026-09-20T10:00:00.000Z",
   },
@@ -517,6 +520,7 @@ const insightSeed: InsightRow[] = [
     id: "00000000-0000-4000-8000-000000000012",
     title: "Top Trade Income Growth",
     value: "+18%",
+    detail: "",
     created_at: "2026-09-21T09:00:00.000Z",
     updated_at: "2026-09-21T11:00:00.000Z",
   },
@@ -532,6 +536,8 @@ test("GET /api/insights returns updated_at DESC", async () => {
       body.insights.map((row) => row.title),
       ["Top Trade Income Growth", "University 4-year ROI"]
     );
+    assert.equal(body.insights[0]?.detail, "");
+    assert.match(body.insights[1]?.detail ?? "", /Four-year ROI/);
   });
 });
 
@@ -551,9 +557,26 @@ test("POST /api/insight inserts then upserts on exact title", async () => {
       id: "660e8400-e29b-41d4-a716-446655440000",
       title: "Top Trade Income Growth",
       value: "+18%",
+      detail: "",
       created_at: "2026-09-21T12:00:00.000Z",
       updated_at: "2026-09-21T12:00:00.000Z",
     });
+
+    const withDetail = await app.inject({
+      method: "POST",
+      url: "/api/insight",
+      headers: { "content-type": "application/json" },
+      payload: {
+        title: "Top Trade Income Growth",
+        value: "+18%",
+        detail: "  Electricians and HVAC leads still outpace degree-only paths.\nKeep a waitlist.  ",
+      },
+    });
+    assert.equal(withDetail.statusCode, 200);
+    assert.equal(
+      (withDetail.json() as InsightRow).detail,
+      "Electricians and HVAC leads still outpace degree-only paths.\nKeep a waitlist."
+    );
 
     const updated = await app.inject({
       method: "POST",
@@ -565,6 +588,10 @@ test("POST /api/insight inserts then upserts on exact title", async () => {
     const row = updated.json() as InsightRow;
     assert.equal(row.id, "660e8400-e29b-41d4-a716-446655440000");
     assert.equal(row.value, "+21%");
+    assert.equal(
+      row.detail,
+      "Electricians and HVAC leads still outpace degree-only paths.\nKeep a waitlist."
+    );
     assert.equal(row.created_at, "2026-09-21T12:00:00.000Z");
 
     const listed = await app.inject({ method: "GET", url: "/api/insights" });
@@ -580,6 +607,12 @@ test("POST /api/insight validation failures", async () => {
       { payload: { title: "", value: "+18%" }, field: "title", rule: "length_1_200" },
       { payload: { title: "ROI", value: "  " }, field: "value", rule: "length_1_500" },
       { payload: { title: "ROI", value: "+18%", extra: 1 }, field: "extra", rule: "unknown_key" },
+      { payload: { title: "ROI", value: "+18%", detail: 1 }, field: "detail", rule: "string" },
+      {
+        payload: { title: "ROI", value: "+18%", detail: "x".repeat(8001) },
+        field: "detail",
+        rule: "length_0_8000",
+      },
     ];
 
     for (const c of cases) {

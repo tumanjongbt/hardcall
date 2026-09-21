@@ -5,6 +5,8 @@ export type ValidationDetail = {
   rule: string;
 };
 
+export const DETAIL_MAX: number;
+
 export function validateUpsertInsight(
   body: unknown
 ): { ok: true; value: CreateInsight } | { ok: false; details: ValidationDetail[] };

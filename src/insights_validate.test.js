@@ -22,6 +22,20 @@ const trimmed = ok({
 });
 assert.equal(trimmed.title, "Top Trade Income Growth");
 assert.equal(trimmed.value, "+18%");
+assert.equal(trimmed.detail, undefined);
+
+const withDetail = ok({
+  title: "Highest Tuition Payload",
+  value: "Traditional 4-Year University",
+  detail: "  Four-year sticker cost stays the heaviest payload.\nCounselors should stack aid.  ",
+});
+assert.equal(
+  withDetail.detail,
+  "Four-year sticker cost stays the heaviest payload.\nCounselors should stack aid."
+);
+
+const blankDetail = ok({ title: "ROI", value: "+6%", detail: "   " });
+assert.equal(blankDetail.detail, "");
 
 fail({ value: "+18%" }, "title", "required");
 fail({ title: "ROI" }, "value", "required");
@@ -29,6 +43,8 @@ fail({ title: "", value: "+18%" }, "title", "length_1_200");
 fail({ title: "ROI", value: "" }, "value", "length_1_500");
 fail({ title: "ROI", value: "+18%", extra: 1 }, "extra", "unknown_key");
 fail({ title: 12, value: "+18%" }, "title", "string");
+fail({ title: "ROI", value: "+18%", detail: 9 }, "detail", "string");
+fail({ title: "ROI", value: "+18%", detail: "x".repeat(8001) }, "detail", "length_0_8000");
 fail(null, "_", "object_required");
 
 console.log("insights_validate: ok");

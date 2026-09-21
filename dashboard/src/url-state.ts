@@ -12,6 +12,7 @@ export function defaultViewState(): ViewState {
     perPage: DEFAULT_PER_PAGE,
     channel: null,
     q: "",
+    insight: null,
   };
 }
 
@@ -34,12 +35,16 @@ export function parseViewState(search: string): ViewState {
   const channelRaw = params.get("channel");
   const channel =
     channelRaw && isChannel(channelRaw) ? channelRaw : null;
+  const insightRaw = (params.get("insight") ?? "").trim();
+  const insight = insightRaw.length > 0 ? insightRaw : null;
+  const tab = insight ? "insights" : parseTab(params.get("tab"));
   return {
-    tab: parseTab(params.get("tab")),
+    tab,
     page,
     perPage: parsePerPage(params.get("perPage")),
     channel,
     q: (params.get("q") ?? "").trim(),
+    insight,
   };
 }
 
@@ -51,6 +56,9 @@ export function serializeViewState(state: ViewState): string {
   if (state.channel) params.set("channel", state.channel);
   const q = state.q.trim();
   if (q) params.set("q", q);
+  if (state.tab === "insights" && state.insight) {
+    params.set("insight", state.insight);
+  }
   return params.toString();
 }
 
