@@ -6,9 +6,16 @@ import {
   EMPTY_COMPARE,
   FORECAST_NOTE,
   NON_ADVISORY,
+  STORE_FOOTNOTE,
   compareCaption,
   spikeCaption,
 } from "./copy";
+
+test("store footnote does not claim live market data", () => {
+  assert.match(STORE_FOOTNOTE, /event store/);
+  assert.match(STORE_FOOTNOTE, /demo until live BLS/);
+  assert.equal(STORE_FOOTNOTE.toLowerCase().includes("live market data"), false);
+});
 
 test("decision line is a single scannable question", () => {
   assert.match(DECISION_LINE, /labor-market signal/);

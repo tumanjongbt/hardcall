@@ -33,11 +33,16 @@ GET /api/events?channel=trade&limit=200
       "description": null,
       "emoji": "📈",
       "tags": ["college_students", "parents"],
-      "created_at": "2026-09-20T23:56:00.000Z"
+      "created_at": "2026-09-20T23:56:00.000Z",
+      "source": "synthetic",
+      "source_url": null,
+      "fetched_at": null
     }
   ]
 }
 ```
+
+`source` is one of: `synthetic` \| `manual` \| `playground` \| `cli` \| `bls` \| `onet` \| `unknown`. Existing seed/mock rows were backfilled to `synthetic`. `bls` / `onet` appear only after live adapters ship.
 
 Order is `created_at DESC`, then `id DESC`. There is no `q` parameter — clients search title, description, and tags on the returned set.
 

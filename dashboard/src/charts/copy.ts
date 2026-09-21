@@ -3,6 +3,10 @@ import { CHANNEL_LABELS, channelLabel, type Channel } from "../channels";
 export const DECISION_LINE =
   "Which education path is drawing more labor-market signal right now — and is automation pressure rising?";
 
+/** Honest store footnote — charts are not a live BLS/O*NET feed. */
+export const STORE_FOOTNOTE =
+  "Charts aggregate the event store (demo until live BLS and O*NET adapters ship).";
+
 export const EMPTY_COMPARE = "No data for selected paths";
 
 /** Short primary-viz captions. Secondary walls live behind More views. */

@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 /**
- * After Bernard pastes migrations/003_insights_detail.sql in the Supabase
- * SQL editor (Render free cannot run release migrate — same as 002), POST
- * analysis bodies for the eight live KPI titles. Exact-title upsert: value
- * is reused from GET /api/insights when present so we do not wipe KPIs.
+ * After Bernard pastes migrations/004_event_provenance.sql (and 003 if needed)
+ * in the Supabase SQL editor (Render free cannot run release migrate), POST
+ * analysis bodies for the eight seeded KPI titles with source: "synthetic".
+ * Exact-title upsert: value is reused from GET /api/insights when present
+ * so we do not wipe KPIs.
  *
  *   EVENTS_API_URL=https://hardcall-api.onrender.com node scripts/seed-insight-details.js
  *
@@ -11,7 +12,7 @@
  *
  *   curl -sS -X POST "$EVENTS_API_URL/api/insight" \
  *     -H 'Content-Type: application/json' \
- *     -d '{"title":"Top Trade Income Growth","value":"+19%","detail":"..."}'
+ *     -d '{"title":"Top Trade Income Growth","value":"+19%","detail":"...","source":"synthetic"}'
  */
 
 const API = (process.env.EVENTS_API_URL || "https://hardcall-api.onrender.com").replace(
@@ -76,7 +77,7 @@ async function main() {
   for (const [title, seed] of Object.entries(SEEDS)) {
     const existing = current.get(title);
     const value = existing?.value || seed.value;
-    const payload = { title, value, detail: seed.detail };
+    const payload = { title, value, detail: seed.detail, source: "synthetic" };
     const posted = await fetch(`${API}/api/insight`, {
       method: "POST",
       headers: { "content-type": "application/json" },

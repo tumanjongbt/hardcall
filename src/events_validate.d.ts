@@ -1,7 +1,9 @@
-import type { CreateEvent } from "./types";
+import type { CreateEvent, EventSource } from "./types";
 
 export const CHANNELS: Set<string>;
 export const STAKEHOLDER_TAGS: Set<string>;
+export const EVENT_SOURCES: Set<EventSource>;
+export const DEFAULT_EVENT_SOURCE: EventSource;
 
 export type ValidationDetail = {
   field: string;

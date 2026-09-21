@@ -125,6 +125,7 @@ async function main(argv, io = {}) {
   const body = {
     channel: values.channel,
     title: values.title,
+    source: "cli",
   };
   if (values.description !== undefined) body.description = values.description;
   if (values.icon !== undefined) body.emoji = values.icon;

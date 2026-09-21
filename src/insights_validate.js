@@ -1,11 +1,20 @@
 /** POST /api/insight — boundary validation. Trust DB constraints after parse. */
 
-const ALLOWED_KEYS = new Set(["title", "value", "detail"]);
+const ALLOWED_KEYS = new Set(["title", "value", "detail", "source"]);
 const DETAIL_MAX = 8000;
+
+/** Documented insight provenance. Smaller set than events (no playground/cli). */
+const INSIGHT_SOURCES = new Set([
+  "synthetic",
+  "manual",
+  "bls",
+  "onet",
+  "unknown",
+]);
 
 /**
  * @param {unknown} body
- * @returns {{ ok: true, value: { title: string, value: string, detail?: string } } | { ok: false, details: { field: string, rule: string }[] }}
+ * @returns {{ ok: true, value: { title: string, value: string, detail?: string, source?: string } } | { ok: false, details: { field: string, rule: string }[] }}
  */
 function validateUpsertInsight(body) {
   const details = [];
@@ -59,16 +68,29 @@ function validateUpsertInsight(body) {
     }
   }
 
+  const sourceProvided = Object.prototype.hasOwnProperty.call(body, "source");
+  let source;
+  if (sourceProvided) {
+    const raw = body.source;
+    if (typeof raw !== "string" || !INSIGHT_SOURCES.has(raw)) {
+      details.push({ field: "source", rule: "enum" });
+    } else {
+      source = raw;
+    }
+  }
+
   if (details.length) return { ok: false, details };
 
-  /** @type {{ title: string, value: string, detail?: string }} */
+  /** @type {{ title: string, value: string, detail?: string, source?: string }} */
   const parsed = { title, value };
   if (detailProvided) parsed.detail = detail;
+  if (sourceProvided) parsed.source = source;
 
   return { ok: true, value: parsed };
 }
 
 module.exports = {
   DETAIL_MAX,
+  INSIGHT_SOURCES,
   validateUpsertInsight,
 };

@@ -1,5 +1,16 @@
 import type { AudienceLensId } from "./channels";
 
+export type EventSource =
+  | "synthetic"
+  | "manual"
+  | "playground"
+  | "cli"
+  | "bls"
+  | "onet"
+  | "unknown";
+
+export type InsightSource = "synthetic" | "manual" | "bls" | "onet" | "unknown";
+
 export type EventRow = {
   id: string;
   channel: string;
@@ -8,6 +19,9 @@ export type EventRow = {
   emoji: string | null;
   tags: string[];
   created_at: string;
+  source?: EventSource | string;
+  source_url?: string | null;
+  fetched_at?: string | null;
 };
 
 export type InsightRow = {
@@ -15,6 +29,7 @@ export type InsightRow = {
   title: string;
   value: string;
   detail: string;
+  source?: InsightSource | string;
   created_at: string;
   updated_at: string;
 };

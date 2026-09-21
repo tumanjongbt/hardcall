@@ -1,9 +1,23 @@
+export type EventSource =
+  | "synthetic"
+  | "manual"
+  | "playground"
+  | "cli"
+  | "bls"
+  | "onet"
+  | "unknown";
+
+export type InsightSource = "synthetic" | "manual" | "bls" | "onet" | "unknown";
+
 export type CreateEvent = {
   channel: string;
   title: string;
   description: string | null;
   emoji: string | null;
   tags: string[];
+  source: EventSource;
+  source_url: string | null;
+  fetched_at: string | null;
 };
 
 export type EventRow = {
@@ -14,6 +28,9 @@ export type EventRow = {
   emoji: string | null;
   tags: string[];
   created_at: string;
+  source: EventSource;
+  source_url: string | null;
+  fetched_at: string | null;
 };
 
 export type ListEventsQuery = {
@@ -31,6 +48,8 @@ export type CreateInsight = {
   value: string;
   /** Present only when the client sent `detail` (omitted on update keeps the stored body). */
   detail?: string;
+  /** Present only when the client sent `source` (omitted on update keeps the stored source). */
+  source?: InsightSource;
 };
 
 export type InsightRow = {
@@ -38,6 +57,7 @@ export type InsightRow = {
   title: string;
   value: string;
   detail: string;
+  source: InsightSource;
   created_at: string;
   updated_at: string;
 };

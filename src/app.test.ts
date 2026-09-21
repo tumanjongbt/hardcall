@@ -25,6 +25,9 @@ function memoryStore(
         id: "550e8400-e29b-41d4-a716-446655440000",
         ...value,
         created_at: "2026-09-20T23:56:00.000Z",
+        source: value.source,
+        source_url: value.source_url,
+        fetched_at: value.fetched_at,
       };
       rows.unshift(row);
       return row;
@@ -44,6 +47,7 @@ function memoryStore(
       if (existing) {
         existing.value = value.value;
         if (value.detail !== undefined) existing.detail = value.detail;
+        if (value.source !== undefined) existing.source = value.source;
         existing.updated_at = now;
         return { row: { ...existing }, created: false };
       }
@@ -52,6 +56,7 @@ function memoryStore(
         title: value.title,
         value: value.value,
         detail: value.detail ?? "",
+        source: value.source ?? "synthetic",
         created_at: now,
         updated_at: now,
       };
@@ -68,7 +73,7 @@ function memoryStore(
 }
 
 async function withApp(
-  store: EventStore,
+  store: Store,
   fn: (app: ReturnType<typeof createApp>) => Promise<void>
 ) {
   const app = createApp(store);
@@ -113,6 +118,9 @@ const seedRows: EventRow[] = [
     emoji: "🔧",
     tags: ["high_school_students"],
     created_at: "2026-09-20T10:00:00.000Z",
+    source: "synthetic",
+    source_url: null,
+    fetched_at: null,
   },
   {
     id: "00000000-0000-4000-8000-000000000002",
@@ -122,6 +130,9 @@ const seedRows: EventRow[] = [
     emoji: "📈",
     tags: ["college_students", "parents"],
     created_at: "2026-09-21T10:00:00.000Z",
+    source: "synthetic",
+    source_url: null,
+    fetched_at: null,
   },
   {
     id: "00000000-0000-4000-8000-000000000003",
@@ -131,6 +142,9 @@ const seedRows: EventRow[] = [
     emoji: null,
     tags: ["parents"],
     created_at: "2026-09-21T10:00:00.000Z",
+    source: "synthetic",
+    source_url: null,
+    fetched_at: null,
   },
 ];
 
@@ -254,6 +268,9 @@ test("POST /api/events stores a valid body", async () => {
         emoji: "📈",
         tags: ["college_students", "parents"],
         created_at: "2026-09-20T23:56:00.000Z",
+        source: "manual",
+        source_url: null,
+        fetched_at: null,
       });
       assert.deepEqual(stored, {
         channel: "university",
@@ -261,6 +278,9 @@ test("POST /api/events stores a valid body", async () => {
         description: "optional",
         emoji: "📈",
         tags: ["college_students", "parents"],
+        source: "manual",
+        source_url: null,
+        fetched_at: null,
       });
     }
   );
@@ -317,6 +337,21 @@ test("POST /api/events validation failures", async () => {
         payload: { channel: "university", title: "x", extra: 1 },
         field: "extra",
         rule: "unknown_key",
+      },
+      {
+        payload: { channel: "university", title: "x", source: "scraper" },
+        field: "source",
+        rule: "enum",
+      },
+      {
+        payload: { channel: "university", title: "x", source_url: "not-a-url" },
+        field: "source_url",
+        rule: "http_url",
+      },
+      {
+        payload: { channel: "university", title: "x", fetched_at: "yesterday" },
+        field: "fetched_at",
+        rule: "iso_datetime",
       },
     ];
 
@@ -513,6 +548,7 @@ const insightSeed: InsightRow[] = [
     title: "University 4-year ROI",
     value: "+6%",
     detail: "Four-year ROI is still positive in this metro, but slower than short paths.",
+    source: "synthetic",
     created_at: "2026-09-20T10:00:00.000Z",
     updated_at: "2026-09-20T10:00:00.000Z",
   },
@@ -521,6 +557,7 @@ const insightSeed: InsightRow[] = [
     title: "Top Trade Income Growth",
     value: "+18%",
     detail: "",
+    source: "synthetic",
     created_at: "2026-09-21T09:00:00.000Z",
     updated_at: "2026-09-21T11:00:00.000Z",
   },
@@ -537,6 +574,7 @@ test("GET /api/insights returns updated_at DESC", async () => {
       ["Top Trade Income Growth", "University 4-year ROI"]
     );
     assert.equal(body.insights[0]?.detail, "");
+    assert.equal(body.insights[0]?.source, "synthetic");
     assert.match(body.insights[1]?.detail ?? "", /Four-year ROI/);
   });
 });
@@ -558,6 +596,7 @@ test("POST /api/insight inserts then upserts on exact title", async () => {
       title: "Top Trade Income Growth",
       value: "+18%",
       detail: "",
+      source: "synthetic",
       created_at: "2026-09-21T12:00:00.000Z",
       updated_at: "2026-09-21T12:00:00.000Z",
     });
@@ -607,6 +646,7 @@ test("POST /api/insight validation failures", async () => {
       { payload: { title: "", value: "+18%" }, field: "title", rule: "length_1_200" },
       { payload: { title: "ROI", value: "  " }, field: "value", rule: "length_1_500" },
       { payload: { title: "ROI", value: "+18%", extra: 1 }, field: "extra", rule: "unknown_key" },
+      { payload: { title: "ROI", value: "+18%", source: "cli" }, field: "source", rule: "enum" },
       { payload: { title: "ROI", value: "+18%", detail: 1 }, field: "detail", rule: "string" },
       {
         payload: { title: "ROI", value: "+18%", detail: "x".repeat(8001) },
@@ -697,6 +737,73 @@ test("POST /api/insight persist failure is opaque", async () => {
     assert.equal(res.statusCode, 500);
     assert.deepEqual(res.json(), { error: "persist_failed" });
     assert.equal(res.body.includes("secret-host"), false);
+  });
+});
+
+test("POST /api/events accepts playground provenance", async () => {
+  let stored: CreateEvent | undefined;
+  await withApp(
+    memoryStore((value) => {
+      stored = value;
+      return {
+        id: "550e8400-e29b-41d4-a716-446655440000",
+        ...value,
+        created_at: "2026-09-20T23:56:00.000Z",
+      };
+    }),
+    async (app) => {
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/events",
+        headers: { "content-type": "application/json" },
+        payload: {
+          channel: "trade",
+          title: "Playground row",
+          source: "playground",
+          source_url: "https://example.com/playground",
+          fetched_at: "2026-09-21T08:30:00Z",
+        },
+      });
+      assert.equal(res.statusCode, 201);
+      const body = res.json() as EventRow;
+      assert.equal(body.source, "playground");
+      assert.equal(body.source_url, "https://example.com/playground");
+      assert.equal(body.fetched_at, "2026-09-21T08:30:00.000Z");
+      assert.equal(stored?.source, "playground");
+    }
+  );
+});
+
+test("GET /api/events includes provenance fields", async () => {
+  await withApp(memoryStore(undefined, seedRows), async (app) => {
+    const res = await app.inject({ method: "GET", url: "/api/events?limit=1" });
+    assert.equal(res.statusCode, 200);
+    const body = res.json() as { events: EventRow[] };
+    assert.equal(body.events[0]?.source, "synthetic");
+    assert.equal(body.events[0]?.source_url, null);
+    assert.equal(body.events[0]?.fetched_at, null);
+  });
+});
+
+test("POST /api/insight keeps source when omitted on update", async () => {
+  await withApp(memoryStore(), async (app) => {
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/insight",
+      headers: { "content-type": "application/json" },
+      payload: { title: "Trade overtime", value: "elevated", source: "synthetic" },
+    });
+    assert.equal((created.json() as InsightRow).source, "synthetic");
+
+    const updated = await app.inject({
+      method: "POST",
+      url: "/api/insight",
+      headers: { "content-type": "application/json" },
+      payload: { title: "Trade overtime", value: "still elevated" },
+    });
+    assert.equal(updated.statusCode, 200);
+    assert.equal((updated.json() as InsightRow).source, "synthetic");
+    assert.equal((updated.json() as InsightRow).value, "still elevated");
   });
 });
 

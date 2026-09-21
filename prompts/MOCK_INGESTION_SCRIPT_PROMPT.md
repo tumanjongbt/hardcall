@@ -34,7 +34,7 @@ Expect `{ "ok": true }`. If that fails, stop.
 
 ### JSON body (exact keys only)
 
-Unknown top-level keys → **400**. Server sets `id` and `created_at`. Success is **201** (treat **200** as success if it appears).
+Unknown top-level keys → **400**. Server sets `id` and `created_at`. Success is **201** (treat **200** as success if it appears). Always send `source: "synthetic"` so counselors never mistake these rows for live BLS/O*NET.
 
 ```json
 {
@@ -42,7 +42,8 @@ Unknown top-level keys → **400**. Server sets `id` and `created_at`. Success i
   "title": "CS starting salaries up in metro X",
   "description": "optional",
   "emoji": "📈",
-  "tags": ["college_students", "parents"]
+  "tags": ["college_students", "parents"],
+  "source": "synthetic"
 }
 ```
 
@@ -53,6 +54,7 @@ Unknown top-level keys → **400**. Server sets `id` and `created_at`. Success i
 | `description` | no | omit when empty; else trim; length **1–4000** |
 | `emoji` | no | omit when empty; else trim; length **1–16** (a single emoji is enough) |
 | `tags` | no | array, default `[]`; unique; each item one of the stakeholder tags below |
+| `source` | yes for this seed | exactly `synthetic` (do **not** send `bls` or `onet`) |
 
 **Stakeholder tags (only these):**
 
@@ -62,7 +64,7 @@ Unknown top-level keys → **400**. Server sets `id` and `created_at`. Success i
 - `career_counselors`
 - `workforce_training_managers`
 
-Do **not** send `id`, `created_at`, or any other key.
+Do **not** send `id`, `created_at`, `bls`, `onet`, or any other key.
 
 ### POST example
 
@@ -75,7 +77,8 @@ curl -sS -X POST "$API/api/events" \
     "title": "HVAC techs: BLS-style wage growth still leads licensed trades",
     "description": "Synthetic demo: occupational wage growth remains elevated for HVAC and electricians versus clerical work. Typical path: certificate or apprenticeship, not a four-year degree. Automation risk is low for on-site diagnostics.",
     "emoji": "🔧",
-    "tags": ["high_school_students", "career_counselors"]
+    "tags": ["high_school_students", "career_counselors"],
+    "source": "synthetic"
   }'
 ```
 
@@ -189,7 +192,7 @@ node cli/src/events.js push \
 - No new backend routes
 - No BLS/O*NET API keys or live scrapers
 - No `POST /api/insight` unless the operator also asked for KPIs
-- No `hardcall` in JSON field names or error handling — the contract is channel/title/description/emoji/tags
+- No `hardcall` in JSON field names or error handling — the contract is channel/title/description/emoji/tags/source
 
 ## Done when
 
