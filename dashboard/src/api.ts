@@ -1,5 +1,16 @@
 import { apiBase, LIST_FETCH_LIMIT } from "./config";
-import type { EventRow, StreamStatus } from "./types";
+import type { EventRow, InsightRow, StreamStatus } from "./types";
+
+export function parseInsightsPayload(body: unknown): InsightRow[] {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    throw new Error("invalid_insights_payload");
+  }
+  const insights = (body as { insights?: unknown }).insights;
+  if (!Array.isArray(insights)) {
+    throw new Error("invalid_insights_payload");
+  }
+  return insights as InsightRow[];
+}
 
 export async function fetchEvents(base = apiBase()): Promise<EventRow[]> {
   const url = `${base}/api/events?limit=${LIST_FETCH_LIMIT}`;
@@ -14,6 +25,16 @@ export async function fetchEvents(base = apiBase()): Promise<EventRow[]> {
     throw new Error("invalid_list_payload");
   }
   return body.events as EventRow[];
+}
+
+export async function fetchInsights(base = apiBase()): Promise<InsightRow[]> {
+  const res = await fetch(`${base}/api/insights`);
+  if (!res.ok) {
+    const error = new Error(`HTTP ${res.status}`) as Error & { status: number };
+    error.status = res.status;
+    throw error;
+  }
+  return parseInsightsPayload(await res.json());
 }
 
 export function subscribeEvents(

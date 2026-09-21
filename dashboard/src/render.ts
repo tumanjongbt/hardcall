@@ -1,5 +1,6 @@
 import { CHANNELS, CHANNEL_LABELS, channelLabel, tagLabel } from "./channels";
-import type { EventRow, StreamStatus, ViewState } from "./types";
+import { insightTone } from "./insights";
+import type { DashboardTab, EventRow, InsightRow, StreamStatus, ViewState } from "./types";
 
 export type FeedModel = {
   events: EventRow[];
@@ -157,6 +158,83 @@ function renderCard(event: EventRow, fresh: boolean): HTMLLIElement {
     card.append(tags);
   }
   return card;
+}
+
+export type InsightsModel = {
+  insights: InsightRow[];
+  loading: boolean;
+  loadError: string | null;
+  lastLoadedAt: string | null;
+};
+
+export function renderTabs(
+  root: HTMLElement,
+  tab: DashboardTab,
+  onTab: (tab: DashboardTab) => void
+): void {
+  root.replaceChildren();
+  const options: Array<{ value: DashboardTab; label: string }> = [
+    { value: "events", label: "Events" },
+    { value: "insights", label: "Market Insights" },
+  ];
+  for (const option of options) {
+    const button = el("button", "tab", option.label);
+    button.type = "button";
+    button.dataset.tab = option.value;
+    button.setAttribute("aria-pressed", tab === option.value ? "true" : "false");
+    if (tab === option.value) button.classList.add("is-active");
+    button.addEventListener("click", () => onTab(option.value));
+    root.append(button);
+  }
+}
+
+export function renderInsights(root: HTMLElement, model: InsightsModel): void {
+  root.replaceChildren();
+  if (model.loading && model.insights.length === 0) {
+    root.append(el("p", "empty", "Pulling market signals…"));
+    return;
+  }
+  if (model.loadError && model.insights.length === 0) {
+    const box = el("div", "empty empty--error");
+    box.append(el("p", "empty__title", "Could not load insights"));
+    box.append(el("p", undefined, model.loadError));
+    root.append(box);
+    return;
+  }
+  if (model.insights.length === 0) {
+    root.append(
+      el("p", "empty", "No market insights yet. POST /api/insight to publish a KPI.")
+    );
+    return;
+  }
+
+  const grid = el("ul", "kpi-grid");
+  for (const insight of model.insights) {
+    grid.append(renderKpiCard(insight));
+  }
+  root.append(grid);
+}
+
+function renderKpiCard(insight: InsightRow): HTMLLIElement {
+  const tone = insightTone(insight.value);
+  const card = el("li", `kpi-card kpi-card--${tone}`);
+  card.dataset.insightId = insight.id;
+  card.append(el("p", "kpi-card__title", insight.title));
+  card.append(el("p", "kpi-card__value", insight.value));
+  const time = el("time", "kpi-card__when", `Updated ${formatWhen(insight.updated_at)}`);
+  time.dateTime = insight.updated_at;
+  card.append(time);
+  return card;
+}
+
+export function renderInsightsMeta(root: HTMLElement, model: InsightsModel): void {
+  if (model.loading && model.insights.length === 0) {
+    root.textContent = "Loading insights…";
+    return;
+  }
+  const count = `${model.insights.length} KPI${model.insights.length === 1 ? "" : "s"}`;
+  const refreshed = model.lastLoadedAt ? ` · refreshed ${formatWhen(model.lastLoadedAt)}` : "";
+  root.textContent = `${count}${refreshed}`;
 }
 
 export function renderPagination(

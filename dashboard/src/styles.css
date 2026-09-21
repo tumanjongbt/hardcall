@@ -60,6 +60,38 @@ body {
   font-style: italic;
 }
 
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 22px;
+}
+
+.tab {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--void) 40%, transparent);
+  color: var(--paper);
+  border-radius: 999px;
+  padding: 10px 18px;
+  font: inherit;
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.tab:hover,
+.tab:focus-visible {
+  border-color: color-mix(in srgb, var(--nebula) 70%, var(--paper));
+  outline: none;
+}
+
+.tab.is-active {
+  background: color-mix(in srgb, var(--nebula) 55%, var(--void));
+  border-color: var(--nebula);
+}
+
 .live-pill {
   display: inline-flex;
   align-items: center;
@@ -335,6 +367,68 @@ body {
 .empty__title {
   margin: 0 0 8px;
   color: var(--corona);
+}
+
+.kpi-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 14px;
+}
+
+.kpi-card {
+  background: color-mix(in srgb, #14082a 78%, var(--void));
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 20px 20px 16px;
+  box-shadow: var(--shadow);
+  min-height: 148px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.kpi-card--up {
+  border-color: color-mix(in srgb, var(--signal) 55%, var(--line));
+}
+
+.kpi-card--down {
+  border-color: color-mix(in srgb, #ff5d73 45%, var(--line));
+}
+
+.kpi-card__title {
+  margin: 0;
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--paper-dim);
+}
+
+.kpi-card__value {
+  margin: 0;
+  font-size: clamp(1.8rem, 4vw, 2.4rem);
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  color: var(--corona);
+  line-height: 1.1;
+}
+
+.kpi-card--up .kpi-card__value {
+  color: var(--signal);
+}
+
+.kpi-card--down .kpi-card__value {
+  color: #ff5d73;
+}
+
+.kpi-card__when {
+  margin-top: auto;
+  color: var(--paper-dim);
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-size: 0.82rem;
 }
 
 .footnote {

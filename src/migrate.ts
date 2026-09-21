@@ -3,7 +3,21 @@ import fs from "node:fs";
 import path from "node:path";
 import { createPool } from "./db";
 
-const MIGRATION_ID = "001_events";
+type MigrationFile = {
+  id: string;
+  file: string;
+};
+
+function listMigrationFiles(dir: string): MigrationFile[] {
+  return fs
+    .readdirSync(dir)
+    .filter((name) => /^\d+_[\w-]+\.sql$/.test(name))
+    .sort()
+    .map((name) => ({
+      id: name.replace(/\.sql$/, ""),
+      file: path.join(dir, name),
+    }));
+}
 
 async function main() {
   const databaseUrl = process.env.DATABASE_URL;
@@ -12,8 +26,13 @@ async function main() {
     process.exit(1);
   }
 
-  const sqlPath = path.resolve(__dirname, "../migrations/001_events.sql");
-  const sql = fs.readFileSync(sqlPath, "utf8");
+  const migrationsDir = path.resolve(__dirname, "../migrations");
+  const migrations = listMigrationFiles(migrationsDir);
+  if (migrations.length === 0) {
+    console.error(`no migrations found in ${migrationsDir}`);
+    process.exit(1);
+  }
+
   const pool = createPool(databaseUrl);
 
   try {
@@ -24,26 +43,29 @@ async function main() {
       )
     `);
 
-    const { rows } = await pool.query(
-      "SELECT 1 FROM schema_migrations WHERE id = $1",
-      [MIGRATION_ID]
-    );
-    if (rows.length > 0) {
-      console.log(`${MIGRATION_ID} already applied`);
-      return;
-    }
+    for (const migration of migrations) {
+      const { rows } = await pool.query(
+        "SELECT 1 FROM schema_migrations WHERE id = $1",
+        [migration.id]
+      );
+      if (rows.length > 0) {
+        console.log(`${migration.id} already applied`);
+        continue;
+      }
 
-    await pool.query("BEGIN");
-    try {
-      await pool.query(sql);
-      await pool.query("INSERT INTO schema_migrations (id) VALUES ($1)", [
-        MIGRATION_ID,
-      ]);
-      await pool.query("COMMIT");
-      console.log(`${MIGRATION_ID} applied`);
-    } catch (err) {
-      await pool.query("ROLLBACK");
-      throw err;
+      const sql = fs.readFileSync(migration.file, "utf8");
+      await pool.query("BEGIN");
+      try {
+        await pool.query(sql);
+        await pool.query("INSERT INTO schema_migrations (id) VALUES ($1)", [
+          migration.id,
+        ]);
+        await pool.query("COMMIT");
+        console.log(`${migration.id} applied`);
+      } catch (err) {
+        await pool.query("ROLLBACK");
+        throw err;
+      }
     }
   } finally {
     await pool.end();

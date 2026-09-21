@@ -1,5 +1,5 @@
 import { Pool } from "pg";
-import type { CreateEvent, EventRow, EventStore } from "./types";
+import type { CreateEvent, CreateInsight, EventRow, InsightRow, Store } from "./types";
 
 export function createPool(connectionString: string): Pool {
   return new Pool({
@@ -32,7 +32,23 @@ function mapRow(row: {
   };
 }
 
-export function createPgStore(pool: Pool): EventStore {
+function mapInsightRow(row: {
+  id: string;
+  title: string;
+  value: string;
+  created_at: Date | string;
+  updated_at: Date | string;
+}): InsightRow {
+  return {
+    id: row.id,
+    title: row.title,
+    value: row.value,
+    created_at: toIso(row.created_at),
+    updated_at: toIso(row.updated_at),
+  };
+}
+
+export function createPgStore(pool: Pool): Store {
   return {
     async insertEvent(value: CreateEvent): Promise<EventRow> {
       const { rows } = await pool.query(
@@ -53,6 +69,30 @@ export function createPgStore(pool: Pool): EventStore {
         [query.channel ?? null, query.limit]
       );
       return rows.map(mapRow);
+    },
+    async upsertInsight(value: CreateInsight): Promise<{ row: InsightRow; created: boolean }> {
+      const { rows } = await pool.query(
+        `INSERT INTO insights (title, value)
+         VALUES ($1, $2)
+         ON CONFLICT (title) DO UPDATE
+           SET value = EXCLUDED.value,
+               updated_at = now()
+         RETURNING id, title, value, created_at, updated_at, (xmax = 0) AS inserted`,
+        [value.title, value.value]
+      );
+      const row = rows[0];
+      return {
+        row: mapInsightRow(row),
+        created: Boolean(row.inserted),
+      };
+    },
+    async listInsights(): Promise<InsightRow[]> {
+      const { rows } = await pool.query(
+        `SELECT id, title, value, created_at, updated_at
+         FROM insights
+         ORDER BY updated_at DESC, title ASC`
+      );
+      return rows.map(mapInsightRow);
     },
   };
 }

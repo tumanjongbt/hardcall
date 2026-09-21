@@ -4,18 +4,19 @@ Real-time career intelligence pipeline — education ROI and automation resilien
 
 Tagline: *the call that shapes your orbit.*
 
-Phase 1 is the always-on ingest API and cloud Postgres store. Scrapers and data sources `POST /api/events`. Phase 1.5 adds a live SSE stream and a standalone `events` CLI. Phase 2 adds `GET /api/events` (history) and a local dashboard that filters, searches, paginates, and stays on the live stream.
+Phase 1 is the always-on ingest API and cloud Postgres store. Scrapers and data sources `POST /api/events`. Phase 1.5 adds a live SSE stream and a standalone `events` CLI. Phase 2 adds `GET /api/events` (history) and a local dashboard that filters, searches, paginates, and stays on the live stream. Market Insights adds `insights` KPI upserts (`POST /api/insight`) and a 15-second dashboard poll (`GET /api/insights`).
 
 ## What ships
 
 | Piece | Path |
 | --- | --- |
 | Protostar migration | `migrations/001_events.sql` |
-| Orion request validation | `src/events_validate.js` |
-| HTTP contracts | `contracts/POST_api_events.md`, `contracts/GET_api_events.md`, `contracts/GET_api_events_stream.md` |
+| Insights migration | `migrations/002_insights.sql` |
+| Orion request validation | `src/events_validate.js`, `src/insights_validate.js` |
+| HTTP contracts | `contracts/POST_api_events.md`, `contracts/GET_api_events.md`, `contracts/GET_api_events_stream.md`, `contracts/POST_api_insight.md`, `contracts/GET_api_insights.md` |
 | TypeScript API | `src/app.ts`, `src/server.ts`, `src/sse_hub.ts` |
 | `events` CLI | `cli/` (own package; see `cli/README.md`) |
-| Dashboard | `dashboard/` (Vite; see `dashboard/README.md`) |
+| Dashboard | `dashboard/` (Vite; Events feed + Market Insights tab; see `dashboard/README.md`) |
 
 Table name is `events`. Schema identifiers stay product-neutral (no `hardcall` in DDL, routes, or error codes).
 
@@ -28,6 +29,10 @@ Required: `channel`, `title`. Optional: `description`, `emoji`, `tags`. Server s
 **Channels:** `university` · `community_college` · `trade` · `apprenticeship` · `automation`
 
 **Stakeholder tags:** `high_school_students` · `college_students` · `parents` · `career_counselors` · `workforce_training_managers`
+
+## Insight shape
+
+Required: `title`, `value`. Both trimmed strings. Exact `title` is the upsert key (unique). Server sets `id`, `created_at`, `updated_at`. A later POST with the same title updates `value` and `updated_at` only.
 
 ## `DATABASE_URL` (Neon or Supabase)
 
@@ -62,10 +67,10 @@ Direct `db.<ref>.supabase.co` may not resolve from some environments (Cloud Agen
 npm install
 npm run build      # required before migrate (compiled runner)
 npx tsc --noEmit   # optional extra typecheck
-npm run migrate    # applies migrations/001_events.sql once
+npm run migrate    # applies pending files in migrations/ (001_events, 002_insights, …)
 ```
 
-`schema_migrations` records `001_events` so the runner is idempotent. Re-running is a no-op after the first apply.
+`schema_migrations` records each file stem (`001_events`, `002_insights`) so the runner is idempotent. Re-running skips already-applied files. Same release command as events: Render / Railway run `npm run migrate` on deploy (not on every API boot). After this branch merges, **redeploy the Render web service** so the new routes ship and `002_insights` applies against Supabase.
 
 The migration creates `events` plus:
 
@@ -87,10 +92,18 @@ npm run build && npm start
 - `POST /api/events` → `201` + stored row, or `400` / `415` / `500` per the contract
 - `GET /api/events` → `{ "events": [...] }` newest-first (`created_at DESC`, `id DESC`); optional `?channel=` and `?limit=` (default/max 1000)
 - `GET /api/events/stream` → SSE (`text/event-stream`); each new insert is an SSE `message` whose JSON matches the stored row
+- `POST /api/insight` → `201` insert or `200` exact-title upsert; body `{ "title", "value" }`; `400` / `415` / `500` same posture as events
+- `GET /api/insights` → `{ "insights": [...] }` ordered by `updated_at DESC`, then `title ASC`
 
 ```bash
 curl -sS http://127.0.0.1:3000/health
 curl -sS "http://127.0.0.1:3000/api/events?channel=trade&limit=50"
+
+curl -sS http://127.0.0.1:3000/api/insights
+
+curl -sS -X POST http://127.0.0.1:3000/api/insight \
+  -H 'Content-Type: application/json' \
+  -d '{ "title": "Top Trade Income Growth", "value": "+18%" }'
 
 curl -sS -X POST http://127.0.0.1:3000/api/events \
   -H 'Content-Type: application/json' \
@@ -150,7 +163,7 @@ cd dashboard
 VITE_EVENTS_API_URL=http://127.0.0.1:3000 npm run dev
 ```
 
-The feed stays reverse-chronological, listens on SSE, filters by channel, debounces search by 300ms, paginates (50 / 100 / all), and writes `page`, `perPage`, `channel`, and `q` into the URL for bookmarking.
+The Events tab stays reverse-chronological, listens on SSE, filters by channel, debounces search by 300ms, paginates (50 / 100 / all), and writes `page`, `perPage`, `channel`, and `q` into the URL for bookmarking. The Market Insights tab polls `GET /api/insights` on mount and every **15 seconds** (`?tab=insights`).
 
 ### `events` CLI
 

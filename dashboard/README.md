@@ -1,6 +1,6 @@
 # Hardcall dashboard
 
-Local Phase 2 feed for career-market events. Logic lives in `src/*.ts`; presentation lives in `src/styles.css` and the markup in `index.html`.
+Local feed for career-market events plus a **Market Insights** KPI tab. Logic lives in `src/*.ts`; presentation lives in `src/styles.css` and the markup in `index.html`.
 
 Brand: void `#05010A`, nebula `#5B2CFF`, corona `#FFB020`, signal `#2EE6A6`, paper `#F5F2EA`.
 
@@ -12,7 +12,7 @@ npm install
 npm run dev
 ```
 
-Open the Vite URL (default `http://127.0.0.1:5173`). The app reads history from `GET {API}/api/events` and listens on `GET {API}/api/events/stream`.
+Open the Vite URL (default `http://127.0.0.1:5173`). The Events tab reads history from `GET {API}/api/events` and listens on `GET {API}/api/events/stream`. The Market Insights tab polls `GET {API}/api/insights` on mount and every **15 seconds**.
 
 ```bash
 npm test
@@ -50,12 +50,13 @@ These query keys are written with `history.pushState` when a person changes filt
 
 | key | default | meaning |
 | --- | --- | --- |
+| `tab` | omitted (`events`) | `events` or `insights` |
 | `page` | `1` | 1-based page |
 | `perPage` | `50` | `50`, `100`, or `all` |
 | `channel` | omitted | `university` · `community_college` · `trade` · `apprenticeship` · `automation` |
 | `q` | omitted | search over title, description, tags (300ms debounce) |
 
-Example: `/?page=2&perPage=50&channel=trade&q=welding`
+Example: `/?page=2&perPage=50&channel=trade&q=welding` · `/?tab=insights`
 
 Reload restores the same view. Changing channel, search, or per-page resets `page` to `1`.
 
@@ -77,3 +78,11 @@ node cli/src/events.js push \
 ```
 
 The new card should slide/flash in at the top of page 1 when it matches the current filter.
+
+6. **Market Insights tab** — switch to Market Insights (`?tab=insights`). KPI cards should appear (empty until `POST /api/insight`). Wait ~15s or POST a new/updated title and confirm the grid refreshes on the next poll.
+
+```bash
+curl -sS -X POST http://127.0.0.1:3000/api/insight \
+  -H 'Content-Type: application/json' \
+  -d '{ "title": "Top Trade Income Growth", "value": "+18%" }'
+```

@@ -1,7 +1,8 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import { CHANNELS, validateCreateEvent } from "./events_validate";
+import { validateUpsertInsight } from "./insights_validate";
 import { createSseHub, type SseHub } from "./sse_hub";
-import type { EventStore, ListEventsQuery } from "./types";
+import type { ListEventsQuery, Store } from "./types";
 
 const SSE_HEARTBEAT_MS = 15_000;
 const SSE_RETRY_MS = 5_000;
@@ -71,7 +72,7 @@ export function parseListQuery(
 }
 
 export function createApp(
-  store: EventStore,
+  store: Store,
   opts?: { logger?: boolean; hub?: SseHub; heartbeatMs?: number }
 ): FastifyInstance {
   const app = Fastify({
@@ -169,6 +170,38 @@ export function createApp(
       const row = await store.insertEvent(parsed.value);
       hub.broadcast(row);
       return reply.code(201).send(row);
+    } catch (err) {
+      request.log.error(err);
+      return reply.code(500).send({ error: "persist_failed" });
+    }
+  });
+
+  app.get("/api/insights", async (request, reply) => {
+    try {
+      const insights = await store.listInsights();
+      return reply.send({ insights });
+    } catch (err) {
+      request.log.error(err);
+      return reply.code(500).send({ error: "persist_failed" });
+    }
+  });
+
+  app.post("/api/insight", async (request, reply) => {
+    if (!isJsonContentType(request.headers["content-type"])) {
+      return reply.code(415).send({ error: "unsupported_media_type" });
+    }
+
+    const parsed = validateUpsertInsight(request.body);
+    if (!parsed.ok) {
+      return reply.code(400).send({
+        error: "validation_failed",
+        details: parsed.details,
+      });
+    }
+
+    try {
+      const { row, created } = await store.upsertInsight(parsed.value);
+      return reply.code(created ? 201 : 200).send(row);
     } catch (err) {
       request.log.error(err);
       return reply.code(500).send({ error: "persist_failed" });
