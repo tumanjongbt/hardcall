@@ -75,6 +75,43 @@ function mapInsightRow(row: {
   };
 }
 
+/** Postgres undefined_column — live DB missing 006 insight provenance columns. */
+export function isUndefinedColumnError(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  return (err as { code?: string }).code === "42703";
+}
+
+const INSIGHT_LIST_SQL = `SELECT id, title, value, detail, source, source_url, fetched_at, created_at, updated_at
+         FROM insights
+         WHERE ($1::boolean OR source <> 'synthetic')
+         ORDER BY updated_at DESC, title ASC`;
+
+/** Pre-006 insights (004 added source, not source_url/fetched_at). */
+const INSIGHT_LIST_SQL_PRE_006 = `SELECT id, title, value, detail, source, created_at, updated_at
+         FROM insights
+         WHERE ($1::boolean OR source <> 'synthetic')
+         ORDER BY updated_at DESC, title ASC`;
+
+const INSIGHT_UPSERT_SQL = `INSERT INTO insights (title, value, detail, source, source_url, fetched_at)
+         VALUES ($1, $2, COALESCE($3, ''), COALESCE($4, 'synthetic'), $5, $6)
+         ON CONFLICT (title) DO UPDATE
+           SET value = EXCLUDED.value,
+               detail = COALESCE($3, insights.detail),
+               source = COALESCE($4, insights.source),
+               source_url = COALESCE($5, insights.source_url),
+               fetched_at = COALESCE($6, insights.fetched_at),
+               updated_at = now()
+         RETURNING id, title, value, detail, source, source_url, fetched_at, created_at, updated_at, (xmax = 0) AS inserted`;
+
+const INSIGHT_UPSERT_SQL_PRE_006 = `INSERT INTO insights (title, value, detail, source)
+         VALUES ($1, $2, COALESCE($3, ''), COALESCE($4, 'synthetic'))
+         ON CONFLICT (title) DO UPDATE
+           SET value = EXCLUDED.value,
+               detail = COALESCE($3, insights.detail),
+               source = COALESCE($4, insights.source),
+               updated_at = now()
+         RETURNING id, title, value, detail, source, created_at, updated_at, (xmax = 0) AS inserted`;
+
 export function createPgStore(pool: Pool): Store {
   return {
     async insertEvent(value: CreateEvent): Promise<EventRow> {
@@ -116,19 +153,25 @@ export function createPgStore(pool: Pool): Store {
       const source = value.source === undefined ? null : value.source;
       const sourceUrl = value.source_url === undefined ? null : value.source_url;
       const fetchedAt = value.fetched_at === undefined ? null : value.fetched_at;
-      const { rows } = await pool.query(
-        `INSERT INTO insights (title, value, detail, source, source_url, fetched_at)
-         VALUES ($1, $2, COALESCE($3, ''), COALESCE($4, 'synthetic'), $5, $6)
-         ON CONFLICT (title) DO UPDATE
-           SET value = EXCLUDED.value,
-               detail = COALESCE($3, insights.detail),
-               source = COALESCE($4, insights.source),
-               source_url = COALESCE($5, insights.source_url),
-               fetched_at = COALESCE($6, insights.fetched_at),
-               updated_at = now()
-         RETURNING id, title, value, detail, source, source_url, fetched_at, created_at, updated_at, (xmax = 0) AS inserted`,
-        [value.title, value.value, detail, source, sourceUrl, fetchedAt]
-      );
+      let rows: Array<Parameters<typeof mapInsightRow>[0] & { inserted?: boolean }>;
+      try {
+        ({ rows } = await pool.query(INSIGHT_UPSERT_SQL, [
+          value.title,
+          value.value,
+          detail,
+          source,
+          sourceUrl,
+          fetchedAt,
+        ]));
+      } catch (err) {
+        if (!isUndefinedColumnError(err)) throw err;
+        ({ rows } = await pool.query(INSIGHT_UPSERT_SQL_PRE_006, [
+          value.title,
+          value.value,
+          detail,
+          source,
+        ]));
+      }
       const row = rows[0];
       return {
         row: mapInsightRow(row),
@@ -137,14 +180,14 @@ export function createPgStore(pool: Pool): Store {
     },
     async listInsights(query): Promise<InsightRow[]> {
       const includeDemo = query?.includeDemo !== false;
-      const { rows } = await pool.query(
-        `SELECT id, title, value, detail, source, source_url, fetched_at, created_at, updated_at
-         FROM insights
-         WHERE ($1::boolean OR source <> 'synthetic')
-         ORDER BY updated_at DESC, title ASC`,
-        [includeDemo]
-      );
-      return rows.map(mapInsightRow);
+      try {
+        const { rows } = await pool.query(INSIGHT_LIST_SQL, [includeDemo]);
+        return rows.map(mapInsightRow);
+      } catch (err) {
+        if (!isUndefinedColumnError(err)) throw err;
+        const { rows } = await pool.query(INSIGHT_LIST_SQL_PRE_006, [includeDemo]);
+        return rows.map(mapInsightRow);
+      }
     },
   };
 }

@@ -84,14 +84,19 @@ npx tsc --noEmit   # optional extra typecheck
 npm run migrate    # applies pending files in migrations/ (001_events, 002_insights, …)
 ```
 
-`schema_migrations` records each file stem (`001_events` … `007_reserved_live_sources`) so the runner is idempotent. Re-running skips already-applied files. Railway can still run `npm run migrate` on deploy. **Render free-tier does not run a release/pre-deploy migrate** — after merge, Bernard must paste the new SQL in the Supabase SQL editor, then record the stem so a later runner skips it:
+`schema_migrations` records each file stem (`001_events` … `007_reserved_live_sources`) so the runner is idempotent. Re-running skips already-applied files. The API (`npm start`) and ingest CLI apply pending files on boot using a **held client** and **one statement at a time**, so the Supabase transaction pooler can run 006/007 without a Render release command.
+
+**Do you still need to paste 006/007 in Supabase?**
+
+- **No**, if Render logs show `006_domain_warehouse` / `007_reserved_live_sources` applied (or skipped as already applied) after deploy. Warehouse tables then exist; ingest can fill them. `GET /api/insights` should be 200 (empty list is OK until ingest writes live KPIs).
+- **Yes**, if boot migrate errors (permissions, stem recorded without the SQL, or a CHECK that needs a manual remap). Paste `migrations/006_domain_warehouse.sql` then `007_reserved_live_sources.sql` in the SQL editor and record the stems. GET `/api/insights` still returns 200 without those columns: it retries the pre-006 SELECT (`source` only, `source_url`/`fetched_at` null). It does **not** invent KPI rows.
 
 ```sql
+-- Only if boot migrate did not apply 006/007:
 -- 1. Paste the full contents of migrations/006_domain_warehouse.sql
--- 2. Then:
 INSERT INTO schema_migrations (id) VALUES ('006_domain_warehouse')
 ON CONFLICT (id) DO NOTHING;
--- 3. Paste migrations/007_reserved_live_sources.sql
+-- 2. Paste migrations/007_reserved_live_sources.sql
 INSERT INTO schema_migrations (id) VALUES ('007_reserved_live_sources')
 ON CONFLICT (id) DO NOTHING;
 ```
@@ -288,7 +293,7 @@ Render sets `NODE_ENV=production` during install, which omits `devDependencies`.
 2. Build: `npm ci && npm run build`
 3. Start: `npm start`
 4. Environment: `DATABASE_URL` = Neon or Supabase pooler URL. **Production:** `HARDCALL_ALLOW_DEMO=false`.
-5. Release / pre-deploy command: `npm run migrate` (Render **free** often cannot run this — paste new SQL in the Supabase SQL editor instead, same as `002` / `003` / `004` / `005` / `006` / `007`)
+5. Release / pre-deploy command: optional. **`npm start` applies pending migrations before listen** (pooler-safe). Paste 006/007 in Supabase only if boot logs show migrate failed.
 6. Health check path: `/health`
 7. Add a **cron** service: `node dist/ingest/cli.js --source all` (see `docs/DEPLOY.md` and `render.yaml`)
 
@@ -322,7 +327,7 @@ After deploy, `GET https://<host>/health` should return `{ "ok": true }`. Then P
 See `dashboard/README.md` for the full checklist. Short version:
 
 - Celestial brand lives in the dashboard only (see `BRAND.md`). Tokens, Unbounded / DM Sans / IBM Plex Mono, locked celestial-map mark (`dashboard/public/logo.png`) and hero (`dashboard/public/banner-celestial.png`). Do not ship event-horizon, supernova, protostar, or the old geometric amber H. Keep `hardcall` out of routes, DDL, and status enums.
-- **Render free** does not run `npm run migrate` on deploy. Paste new `migrations/*.sql` in Supabase and record the stem in `schema_migrations`, then redeploy the web service. Paid Render / Railway / Fly can use the release command.
+- **Render free** has no release command. The web process applies pending `migrations/*.sql` at boot (held client, one statement at a time). Paste 006/007 in Supabase only if those logs show migrate failed; `GET /api/insights` otherwise falls back to pre-006 columns (empty list, no invented KPIs). Paid Render / Railway / Fly can still set a release command.
 
 ## Out of scope (later)
 

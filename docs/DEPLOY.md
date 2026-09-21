@@ -4,6 +4,10 @@ Production must not serve synthetic / playground / CLI / seed rows as if they we
 
 ## Supabase (SQL editor)
 
+**Paste 006/007 only if boot migrate did not apply them.** After this API deploy, Render `npm start` runs pending migrations against `DATABASE_URL` (held client, one statement at a time — transaction pooler safe). Ingest CLI does the same before a live run.
+
+Check Render logs for `schema migrations` with `006_domain_warehouse` and `007_reserved_live_sources` in `applied` or `skipped`. If both are present, **do not paste**. If migrate failed, paste in order:
+
 1. Paste `migrations/006_domain_warehouse.sql` in full, then `007_reserved_live_sources.sql`.
 2. Record the stems:
 
@@ -13,6 +17,8 @@ ON CONFLICT (id) DO NOTHING;
 INSERT INTO schema_migrations (id) VALUES ('007_reserved_live_sources')
 ON CONFLICT (id) DO NOTHING;
 ```
+
+`GET /api/insights` must not 500 while that SQL is pending: the store retries without `source_url`/`fetched_at` (nulls, no invented rows). Warehouse ingest still needs the 006 tables.
 
 3. Confirm zero public demo rows (or they will be hidden by the API when demo is off):
 

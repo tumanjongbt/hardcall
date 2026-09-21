@@ -3,8 +3,9 @@
 -- provenance, derived-event upsert keys, and tables the ingest worker fills.
 -- Live reserved sources may only be written by server-side adapters (public POST
 -- still rejects them). Every warehouse row requires source + source_url + fetched_at.
--- Render free-tier does not run release migrate — paste this file in the
--- Supabase SQL editor after merge. Then:
+-- Render web/ingest apply this file at boot (held client, one statement at a
+-- time) so the transaction pooler can run it. Paste in the Supabase SQL editor
+-- only if boot migrate failed, then:
 --   INSERT INTO schema_migrations (id) VALUES ('006_domain_warehouse')
 --   ON CONFLICT (id) DO NOTHING;
 
