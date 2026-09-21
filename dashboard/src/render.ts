@@ -176,6 +176,7 @@ export function renderTabs(
   root.replaceChildren();
   const options: Array<{ value: DashboardTab; label: string }> = [
     { value: "events", label: "Events" },
+    { value: "charts", label: "Charts" },
     { value: "insights", label: "Market Insights" },
   ];
   for (const option of options) {
