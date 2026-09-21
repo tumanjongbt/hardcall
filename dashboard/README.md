@@ -2,7 +2,7 @@
 
 Local feed for career-market events, a **Charts** tab for the same telemetry, a **Market Insights** KPI tab, and a **Playground** tab that posts mock scraper payloads to `POST /api/events`. Logic lives in `src/*.ts` (Playground payload + highlighter in `src/playground.ts`); chart bucketing lives in `src/charts/transforms.ts`; Chart.js lifecycle lives in `src/charts/renderCharts.ts`; presentation lives in `src/styles.css` and the markup in `index.html`.
 
-Brand (v2 locked): void `#05010A`, nebula `#5B2CFF`, corona `#FFB020`, accretion `#FF4FBF`, signal `#2EE6A6`, paper `#F5F2EA`, mute `#8B8794`. Display **Unbounded ExtraBold**, UI **DM Sans**, data **IBM Plex Mono**. Masthead lockup: `public/logo.png` + HARDCALL + corona tagline *the call that shapes your orbit.* Events hero: `public/banner-celestial.png`. Product name stays out of API routes and status enums.
+Brand (v2 locked): void `#05010A`, nebula `#5B2CFF`, corona `#FFB020`, accretion `#FF4FBF`, signal `#2EE6A6`, paper `#F5F2EA`, mute `#8B8794`. Display **Unbounded ExtraBold**, UI **DM Sans**, data **IBM Plex Mono**. Primary mark is **event-horizon** only (`public/logo.png` — black void + corona/nebula accretion disk + constellation lines). Masthead is that square mark + HARDCALL wordmark + corona tagline *the call that shapes your orbit.* Do not ship supernova, protostar, or the old geometric amber H, and do not use the full mark+wordmark lockup as the 48px masthead image. Events hero: `public/banner-celestial.png` (celestial map, not a logo option). Product name stays out of API routes and status enums.
 
 ## Run locally
 
@@ -145,6 +145,6 @@ Bulk synthetic records (BLS/O*NET-style demo, no live keys): `prompts/MOCK_INGES
 
 - `VITE_EVENTS_API_URL` is the API **origin only**. It ships in the browser bundle — no secrets.
 - API CORS is open (`*`) this phase. Documented above; restrict when auth exists.
-- `npm --prefix dashboard test && npm --prefix dashboard run build` before a static deploy. Vite copies `public/logo.png`, `public/banner-celestial.png`, and `public/favicon.png` into `dist/`.
+- `npm --prefix dashboard test && npm --prefix dashboard run build` before a static deploy. Vite copies the event-horizon `public/logo.png`, `public/favicon.png`, `public/apple-touch-icon.png`, and `public/banner-celestial.png` into `dist/`.
 - **Render free migrate caveat:** the API service does not run a release command on free tier. After merge, paste new files from `migrations/` in the Supabase SQL editor and `INSERT INTO schema_migrations (id) VALUES ('…') ON CONFLICT (id) DO NOTHING`, then redeploy the web service. Railway / Fly can run `npm run migrate` on release.
 - Hosted dashboard (Vercel) is still later. Until then, run Vite locally against the live or local API.
