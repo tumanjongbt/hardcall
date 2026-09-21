@@ -27,7 +27,7 @@ Ingest is **public** this phase (no API key). Treat that as a Phase 1b follow-up
 
 ## Event shape
 
-Required: `channel`, `title`. Optional: `description`, `emoji`, `tags`, `source`, `source_url`, `fetched_at`. Server sets `id` and `created_at`. Omitted `source` on an anonymous POST defaults to **`manual`**. Playground sends `playground`; CLI sends `cli`; seed/mock ingest should send `synthetic`.
+Required: `channel`, `title`. Optional: `description`, `emoji`, `tags`, `source`, `source_url`, `fetched_at`, `created_at`. Server sets `id`. Omitted `created_at` uses database `now()`; a valid ISO `created_at` is stored on insert only. Omitted `source` on an anonymous POST defaults to **`manual`**. Playground sends `playground`; CLI sends `cli`; seed/mock ingest should send `synthetic`.
 
 **Channels:** `university` · `community_college` · `trade` · `apprenticeship` · `automation`
 

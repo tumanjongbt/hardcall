@@ -49,6 +49,7 @@ const ALLOWED_KEYS = new Set([
   "source",
   "source_url",
   "fetched_at",
+  "created_at",
 ]);
 
 const ISO_DATETIME =
@@ -195,20 +196,27 @@ function validateCreateEvent(body) {
   const fetchedAt = parseFetchedAt(body.fetched_at);
   if (!fetchedAt.ok) details.push({ field: "fetched_at", rule: fetchedAt.rule });
 
+  const createdAt = parseFetchedAt(body.created_at);
+  if (!createdAt.ok) details.push({ field: "created_at", rule: createdAt.rule });
+
   if (details.length) return { ok: false, details };
+
+  /** @type {{ channel: unknown, title: unknown, description: unknown, emoji: unknown, tags: unknown, source: string, source_url: string | null, fetched_at: string | null, created_at?: string }} */
+  const value = {
+    channel,
+    title,
+    description,
+    emoji,
+    tags,
+    source,
+    source_url: sourceUrl.value,
+    fetched_at: fetchedAt.value,
+  };
+  if (createdAt.value) value.created_at = createdAt.value;
 
   return {
     ok: true,
-    value: {
-      channel,
-      title,
-      description,
-      emoji,
-      tags,
-      source,
-      source_url: sourceUrl.value,
-      fetched_at: fetchedAt.value,
-    },
+    value,
   };
 }
 

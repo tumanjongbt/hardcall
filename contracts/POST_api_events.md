@@ -29,8 +29,9 @@ Phase 1 — public ingest. Neutral path (no `hardcall`). Shape mirrors Protostar
 | `source` | no | **Anonymous public POST may send only:** `synthetic` \| `manual` \| `playground` \| `cli` \| `unknown`. **Omitted anonymous POST defaults to `manual`.** Playground must send `playground`. CLI sends `cli`. Seed/mock ingest should send `synthetic`. `bls` / `onet` remain in the stored/GET enum for future locked ingest (Supernova auth) — **anonymous clients cannot set them** (400 `source` / `reserved`). |
 | `source_url` | no | omit or null; if present: trim; empty → null; else must be `http://` or `https://` (max 2000) |
 | `fetched_at` | no | omit or null; if present: ISO 8601 date or datetime; empty → null; stored as UTC ISO |
+| `created_at` | no | omit or null; if present: ISO 8601 date or datetime; empty → server `now()`; **insert only** — used as the stored timestamp when valid |
 
-Reject unknown top-level keys (400). Server sets `id`, `created_at`.
+Reject unknown top-level keys (400). Server sets `id`. Server sets `created_at` to now unless the client sent a valid `created_at`.
 
 ## Responses
 
@@ -55,7 +56,7 @@ After a successful insert the same row is broadcast on `GET /api/events/stream` 
 
 **400** validation — `{ "error": "validation_failed", "details": [ { "field": "title", "rule": "min_length" } ] }`
 
-Unknown `source` uses `rule: "enum"`. Anonymous `source` of `bls` or `onet` uses `rule: "reserved"`. Invalid `source_url` uses `rule: "http_url"`. Invalid `fetched_at` uses `rule: "iso_datetime"`.
+Unknown `source` uses `rule: "enum"`. Anonymous `source` of `bls` or `onet` uses `rule: "reserved"`. Invalid `source_url` uses `rule: "http_url"`. Invalid `fetched_at` or `created_at` uses `rule: "iso_datetime"`.
 
 **415** non-JSON body
 
@@ -66,7 +67,7 @@ Unknown `source` uses `rule: "enum"`. Anonymous `source` of `bls` or `onet` uses
 | condition | status |
 |-----------|--------|
 | valid body, stored | 201 |
-| missing/invalid channel, title, tag, source, source_url, fetched_at, reserved live source (`bls`/`onet`), lengths, unknown keys, non-array tags | 400 |
+| missing/invalid channel, title, tag, source, source_url, fetched_at, created_at, reserved live source (`bls`/`onet`), lengths, unknown keys, non-array tags | 400 |
 | wrong content-type | 415 |
 | DB/unavailable | 500 |
 

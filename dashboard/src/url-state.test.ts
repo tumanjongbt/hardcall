@@ -30,6 +30,8 @@ test("parseViewState reads bookmark query keys", () => {
   assert.equal(parseViewState("?tab=insights").tab, "insights");
   assert.equal(parseViewState("?tab=charts").tab, "charts");
   assert.equal(parseViewState("?tab=playground").tab, "playground");
+  assert.equal(parseViewState("?tab=admin").tab, "admin");
+  assert.equal(parseViewState("?tab=seed").tab, "admin");
   assert.deepEqual(parseViewState("?tab=insights&insight=abc-1").insight, "abc-1");
   assert.equal(parseViewState("?insight=abc-1").tab, "insights");
 });
@@ -171,6 +173,17 @@ test("serializeViewState writes page, perPage, channel, and q", () => {
       insight: null,
     }),
     "/?tab=playground&page=1&perPage=50"
+  );
+  assert.equal(
+    hrefForState({
+      tab: "admin",
+      page: 1,
+      perPage: 50,
+      channel: null,
+      q: "",
+      insight: null,
+    }),
+    "/?tab=admin&page=1&perPage=50"
   );
 });
 

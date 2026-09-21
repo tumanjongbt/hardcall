@@ -1390,3 +1390,65 @@ select.field {
     box-shadow: none;
   }
 }
+
+.dropzone {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  margin: 16px 0 18px;
+  padding: 28px 18px;
+  border: 1px dashed color-mix(in srgb, var(--nebula) 55%, var(--line));
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--nebula) 10%, var(--void));
+  text-align: center;
+}
+
+.dropzone.is-over {
+  border-color: var(--corona);
+  background: color-mix(in srgb, var(--corona) 12%, var(--void));
+}
+
+.dropzone.is-disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.dropzone__title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 650;
+}
+
+.dropzone__hint {
+  margin: 0;
+  color: var(--mute);
+  font-size: 0.85rem;
+}
+
+.dropzone__choose {
+  width: auto;
+  min-width: 12rem;
+}
+
+.seed-status {
+  display: grid;
+  gap: 8px;
+}
+
+.seed-status__line {
+  margin: 0;
+  font-size: 0.92rem;
+}
+
+.seed-status__errors {
+  margin: 0;
+  padding-left: 1.2rem;
+  color: #ff8a9a;
+  font-size: 0.88rem;
+}
+
+.seed-status__success {
+  margin: 0;
+  color: var(--signal);
+  font-weight: 650;
+}

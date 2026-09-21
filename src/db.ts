@@ -75,8 +75,8 @@ export function createPgStore(pool: Pool): Store {
   return {
     async insertEvent(value: CreateEvent): Promise<EventRow> {
       const { rows } = await pool.query(
-        `INSERT INTO events (channel, title, description, emoji, tags, source, source_url, fetched_at)
-         VALUES ($1, $2, $3, $4, $5::stakeholder_tag[], $6, $7, $8)
+        `INSERT INTO events (channel, title, description, emoji, tags, source, source_url, fetched_at, created_at)
+         VALUES ($1, $2, $3, $4, $5::stakeholder_tag[], $6, $7, $8, COALESCE($9::timestamptz, now()))
          RETURNING id, channel, title, description, emoji, tags::text[] AS tags, created_at,
                    source, source_url, fetched_at`,
         [
@@ -88,6 +88,7 @@ export function createPgStore(pool: Pool): Store {
           value.source,
           value.source_url,
           value.fetched_at,
+          value.created_at ?? null,
         ]
       );
       return mapRow(rows[0]);

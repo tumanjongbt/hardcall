@@ -18,6 +18,8 @@ export type CreateEvent = {
   source: EventSource;
   source_url: string | null;
   fetched_at: string | null;
+  /** Insert only. Omitted → database `now()`. */
+  created_at?: string;
 };
 
 export type EventRow = {

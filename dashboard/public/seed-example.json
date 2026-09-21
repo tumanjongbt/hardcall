@@ -1,0 +1,21 @@
+{
+  "events": [
+    {
+      "channel": "trade",
+      "title": "Welding night cohort fills",
+      "description": "Evening seats gone in 48 hours.",
+      "emoji": "🔧",
+      "tags": ["high_school_students"],
+      "minutes_ago": 120,
+      "source": "synthetic"
+    }
+  ],
+  "insights": [
+    {
+      "title": "Trade night-cohort fill",
+      "value": "48h",
+      "detail": "Welding evenings are filling in two days. Keep a waitlist.",
+      "source": "synthetic"
+    }
+  ]
+}
