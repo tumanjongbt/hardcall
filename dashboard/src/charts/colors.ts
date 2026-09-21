@@ -1,9 +1,12 @@
 import type { Channel } from "../channels";
 
-export const NEBULA = "#5b2cff";
-export const CORONA = "#ffb020";
-export const SIGNAL = "#2ee6a6";
-export const PAPER = "#f5f2ea";
+export const VOID = "#05010A";
+export const NEBULA = "#5B2CFF";
+export const CORONA = "#FFB020";
+export const ACCRETION = "#FF4FBF";
+export const SIGNAL = "#2EE6A6";
+export const PAPER = "#F5F2EA";
+export const MUTE = "#8B8794";
 export const PAPER_DIM = "rgba(245, 242, 234, 0.72)";
 export const LINE = "rgba(245, 242, 234, 0.14)";
 export const HUMAN = "#7ce0c3";
@@ -15,7 +18,7 @@ export const CHANNEL_COLORS: Record<Channel, string> = {
   community_college: "#987bf6",
   trade: CORONA,
   apprenticeship: SIGNAL,
-  automation: RISK,
+  automation: ACCRETION,
 };
 
 export const STAKEHOLDER_COLORS: Record<string, string> = {

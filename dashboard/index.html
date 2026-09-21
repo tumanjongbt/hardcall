@@ -3,247 +3,285 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Hardcall — career market</title>
+    <title>Hardcall — the call that shapes your orbit.</title>
+    <meta
+      name="description"
+      content="Live salary, debt, and automation odds before you enroll. Career intelligence across degree, trade, community college, and apprenticeship."
+    />
+    <meta name="theme-color" content="#05010A" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="preconnect" href="https://fonts.bunny.net" />
+    <link
+      href="https://fonts.bunny.net/css?family=dm-sans:400,400i,500,700|ibm-plex-mono:400,500|unbounded:800&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>
+    <a class="skip-link" href="#main">Skip to content</a>
     <div class="sky">
       <header class="masthead">
-        <div>
-          <p class="wordmark">Hardcall</p>
-          <p class="tagline">the call that shapes your orbit.</p>
-        </div>
+        <a class="masthead__brand" href="./" aria-label="Hardcall home">
+          <img
+            class="masthead__logo"
+            src="/logo.png"
+            alt=""
+            width="48"
+            height="48"
+          />
+          <div class="masthead__copy">
+            <p class="wordmark">HARDCALL</p>
+            <p class="tagline">the call that shapes your orbit.</p>
+          </div>
+        </a>
         <div id="stream-status" aria-live="polite"></div>
       </header>
 
-      <nav id="tabs" class="tabs" aria-label="Dashboard views"></nav>
+      <nav id="tabs" class="tabs" role="tablist" aria-label="Dashboard views"></nav>
 
-      <header id="charts-heading" class="charts-heading" hidden>
-        <h1 class="charts-heading__title">Charts</h1>
-        <p id="charts-decision" class="charts-heading__decision"></p>
-      </header>
+      <main id="main" tabindex="-1">
+        <section
+          id="hero"
+          class="hero"
+          aria-label="Celestial map — four paths, one decision star"
+        >
+          <img
+            class="hero__banner"
+            src="/banner-celestial.png"
+            alt="Celestial map: degree, trade, community college, and apprentice orbits meeting at one decision star"
+            width="1280"
+            height="220"
+          />
+        </section>
 
-      <section id="event-filters" class="panel" aria-label="Feed filters">
-        <div class="controls">
-          <div>
-            <span class="control-label" id="channel-label">Channel</span>
-            <div
-              id="channel-filters"
-              class="chip-row"
-              role="group"
-              aria-labelledby="channel-label"
-            ></div>
-          </div>
-          <div>
-            <label class="control-label" for="search">Search</label>
-            <input
-              id="search"
-              class="search"
-              type="search"
-              placeholder="Title, description, or tags"
-              autocomplete="off"
-            />
-          </div>
-          <div id="per-page-block">
-            <span class="control-label" id="per-page-label">Per page</span>
-            <div
-              id="per-page"
-              class="chip-row"
-              role="group"
-              aria-labelledby="per-page-label"
-            ></div>
-          </div>
-        </div>
-      </section>
+        <header id="charts-heading" class="charts-heading" hidden>
+          <h1 class="charts-heading__title">Charts</h1>
+          <p id="charts-decision" class="charts-heading__decision"></p>
+        </header>
 
-      <div id="events-view">
-        <div class="toolbar">
-          <p id="feed-meta"></p>
-        </div>
-        <main id="feed" aria-live="polite"></main>
-        <nav id="pagination" class="pagination" aria-label="Pagination"></nav>
-
-        <p class="footnote">
-          History from <code>GET /api/events</code>. Live rows from
-          <code>GET /api/events/stream</code>. Filters live in the URL so a counselor can bookmark this view.
-        </p>
-      </div>
-
-      <div id="charts-view" hidden>
-        <section id="chart-filters" class="panel" aria-label="Chart decision filters"></section>
-        <section id="charts" aria-label="Event charts"></section>
-        <p class="footnote">
-          Charts read the same loaded events as the feed (<code>GET /api/events</code>
-          plus live SSE), then apply the audience lens. Open <code>?tab=charts</code>.
-          Channel chips and 300ms-debounced search still recompute every viz.
-          Lookback is <code>range=7|14|30|90</code> (default 30; 90 is history).
-          Forecast band chips live on the activity card (<code>forecast=14|30</code>).
-          Lens is <code>lens=</code> or <code>stakeholder=</code>.
-          Path compare is <code>compare=trade,university</code>.
-          Secondary mix, resilience, heat, and per-path bars stay behind
-          <strong>More views</strong>. The <strong>Not advice</strong> chip sits on
-          the forecast — the band is telemetry, not a recommendation.
-        </p>
-      </div>
-
-      <div id="insights-view" hidden>
-        <div class="toolbar">
-          <p id="insights-meta"></p>
-        </div>
-        <section id="insights" aria-label="Market insights" aria-live="polite"></section>
-        <p class="footnote">
-          KPI cards from <code>GET /api/insights</code>, newest <code>updated_at</code> first.
-          Click a card (or press Enter / Space) to open its analysis. The dashboard polls every
-          15 seconds. Deep-link a tile with <code>?tab=insights&amp;insight=&lt;id&gt;</code>.
-          Publish or refresh a card with <code>POST /api/insight</code> (exact title upsert;
-          optional <code>detail</code>).
-        </p>
-      </div>
-
-      <div id="playground-view" hidden>
-        <div class="toolbar">
-          <p id="playground-meta"></p>
-        </div>
-        <div class="playground-layout">
-          <section class="panel" aria-labelledby="playground-form-title">
-            <div class="panel-head">
-              <h2 id="playground-form-title" class="panel-title">Event payload</h2>
-              <div class="panel-actions">
-                <button
-                  type="button"
-                  id="playground-fill-sample"
-                  class="chip chip--compact"
-                >
-                  Fill Sample
-                </button>
-                <button type="button" id="playground-reset" class="chip chip--compact">
-                  Reset
-                </button>
-              </div>
-            </div>
-            <p
-              id="playground-sample-status"
-              class="sample-status"
-              hidden
-              aria-live="polite"
-            ></p>
-            <p class="panel-lede">
-              Compose a career-event payload, preview the exact <code>fetch()</code>
-              a scraper would fire, and post it at the live API. Fill Sample cycles
-              curated examples; the right pane updates as you type.
-            </p>
-            <form id="playground-form" class="playground-form" novalidate>
-              <label class="control-label" for="playground-channel">Channel *</label>
-              <select id="playground-channel" class="field" name="channel" required>
-                <option value="university">University</option>
-                <option value="community_college">Community College</option>
-                <option value="trade">Trade</option>
-                <option value="apprenticeship">Apprenticeship</option>
-                <option value="automation">Automation</option>
-              </select>
-
-              <label class="control-label" for="playground-title">Event title *</label>
-              <input
-                id="playground-title"
-                class="field"
-                name="title"
-                type="text"
-                maxlength="200"
-                aria-required="true"
-                placeholder="e.g. Electrician wages rise 14% in Q3"
-                autocomplete="off"
-              />
-
-              <label class="control-label" for="playground-description">Description</label>
-              <textarea
-                id="playground-description"
-                class="field field--area"
-                name="description"
-                rows="4"
-                maxlength="4000"
-                placeholder="Optional longer description of the event…"
-              ></textarea>
-
-              <label class="control-label" for="playground-emoji">Icon</label>
+        <section id="event-filters" class="panel" aria-label="Feed filters">
+          <div class="controls">
+            <div>
+              <span class="control-label" id="channel-label">Channel</span>
               <div
-                id="playground-emoji-chips"
-                class="chip-row chip-row--emoji"
+                id="channel-filters"
+                class="chip-row"
                 role="group"
-                aria-label="Quick icons"
+                aria-labelledby="channel-label"
               ></div>
-              <input
-                id="playground-emoji"
-                class="field"
-                name="emoji"
-                type="text"
-                maxlength="16"
-                placeholder="📈"
-                autocomplete="off"
-                aria-label="Emoji or icon text"
-              />
-
-              <fieldset class="tag-fieldset">
-                <legend class="control-label">Stakeholder tags</legend>
-                <div class="tag-chip-row">
-                  <label class="check check--chip">
-                    <input type="checkbox" name="tags" value="high_school_students" />
-                    High school students
-                  </label>
-                  <label class="check check--chip">
-                    <input type="checkbox" name="tags" value="college_students" />
-                    College students
-                  </label>
-                  <label class="check check--chip">
-                    <input type="checkbox" name="tags" value="parents" />
-                    Parents
-                  </label>
-                  <label class="check check--chip">
-                    <input type="checkbox" name="tags" value="career_counselors" />
-                    Career counselors
-                  </label>
-                  <label class="check check--chip">
-                    <input type="checkbox" name="tags" value="workforce_training_managers" />
-                    Workforce training managers
-                  </label>
-                </div>
-              </fieldset>
-
-              <div id="playground-error" class="banner banner--error" hidden role="alert"></div>
-
-              <button id="playground-submit" class="submit" type="submit">
-                Submit to API
-              </button>
-              <p class="form-hint">Channel and title are required to submit.</p>
-            </form>
-          </section>
-
-          <section class="panel playground-code-panel" aria-labelledby="playground-preview-title">
-            <div class="panel-head">
-              <h2 id="playground-preview-title" class="panel-title">Generated fetch()</h2>
-              <div class="panel-actions">
-                <button type="button" id="playground-copy" class="chip chip--compact">
-                  Copy
-                </button>
-              </div>
             </div>
-            <p class="panel-lede">
-              Exact JavaScript an external scraper would use to push this event.
-              Public ingest — <code>Content-Type</code> only, no bearer tokens.
-              Updates live as you type.
-            </p>
-            <pre class="code-block" tabindex="0"><code id="playground-fetch" class="language-js"></code></pre>
-          </section>
-        </div>
-        <div id="playground-toast" class="toast" hidden role="status" aria-live="polite"></div>
-        <p class="footnote">
-          Playground posts to <code>POST /api/events</code> at
-          <code>VITE_EVENTS_API_URL</code> (default
-          <code>https://hardcall-api.onrender.com</code>). Open with
-          <code>?tab=playground</code>. Sample catalog:
-          <code>dashboard/src/playgroundSamples.ts</code>. Bulk synthetic records:
-          <code>prompts/MOCK_INGESTION_SCRIPT_PROMPT.md</code>.
-        </p>
-      </div>
+            <div>
+              <label class="control-label" for="search">Search</label>
+              <input
+                id="search"
+                class="search"
+                type="search"
+                placeholder="Title, description, or tags"
+                autocomplete="off"
+              />
+            </div>
+            <div id="per-page-block">
+              <span class="control-label" id="per-page-label">Per page</span>
+              <div
+                id="per-page"
+                class="chip-row"
+                role="group"
+                aria-labelledby="per-page-label"
+              ></div>
+            </div>
+          </div>
+        </section>
+
+        <section
+          id="events-view"
+          role="tabpanel"
+          aria-labelledby="tab-events"
+        >
+          <div class="toolbar">
+            <p id="feed-meta"></p>
+          </div>
+          <div id="feed" aria-live="polite"></div>
+          <nav id="pagination" class="pagination" aria-label="Pagination"></nav>
+
+          <p class="footnote">
+            History plus the live stream. Channel, search, and page stay in the URL.
+          </p>
+        </section>
+
+        <section
+          id="charts-view"
+          role="tabpanel"
+          aria-labelledby="tab-charts"
+          hidden
+        >
+          <section id="chart-filters" class="panel" aria-label="Chart decision filters"></section>
+          <section id="charts" aria-label="Event charts"></section>
+          <p class="footnote">
+            Same events as the feed. Forecast is telemetry, not a path recommendation.
+          </p>
+        </section>
+
+        <section
+          id="insights-view"
+          role="tabpanel"
+          aria-labelledby="tab-insights"
+          hidden
+        >
+          <div class="toolbar">
+            <p id="insights-meta"></p>
+          </div>
+          <section id="insights" aria-label="Market insights" aria-live="polite"></section>
+          <p class="footnote">
+            KPI cards refresh every 15 seconds. Click a card for the analysis.
+          </p>
+        </section>
+
+        <section
+          id="playground-view"
+          role="tabpanel"
+          aria-labelledby="tab-playground"
+          hidden
+        >
+          <div class="toolbar">
+            <p id="playground-meta"></p>
+          </div>
+          <div class="playground-layout">
+            <section class="panel" aria-labelledby="playground-form-title">
+              <div class="panel-head">
+                <h2 id="playground-form-title" class="panel-title">Event payload</h2>
+                <div class="panel-actions">
+                  <button
+                    type="button"
+                    id="playground-fill-sample"
+                    class="chip chip--compact"
+                  >
+                    Fill Sample
+                  </button>
+                  <button type="button" id="playground-reset" class="chip chip--compact">
+                    Reset
+                  </button>
+                </div>
+              </div>
+              <p
+                id="playground-sample-status"
+                class="sample-status"
+                hidden
+                aria-live="polite"
+              ></p>
+              <p class="panel-lede">
+                Compose a career-event payload, preview the exact <code>fetch()</code>
+                a scraper would fire, and post it at the live API. Fill Sample cycles
+                curated examples; the right pane updates as you type.
+              </p>
+              <form id="playground-form" class="playground-form" novalidate>
+                <label class="control-label" for="playground-channel">Channel *</label>
+                <select id="playground-channel" class="field" name="channel" required>
+                  <option value="university">University</option>
+                  <option value="community_college">Community College</option>
+                  <option value="trade">Trade</option>
+                  <option value="apprenticeship">Apprenticeship</option>
+                  <option value="automation">Automation</option>
+                </select>
+
+                <label class="control-label" for="playground-title">Event title *</label>
+                <input
+                  id="playground-title"
+                  class="field"
+                  name="title"
+                  type="text"
+                  maxlength="200"
+                  aria-required="true"
+                  placeholder="e.g. Electrician wages rise 14% in Q3"
+                  autocomplete="off"
+                />
+
+                <label class="control-label" for="playground-description">Description</label>
+                <textarea
+                  id="playground-description"
+                  class="field field--area"
+                  name="description"
+                  rows="4"
+                  maxlength="4000"
+                  placeholder="Optional longer description of the event…"
+                ></textarea>
+
+                <label class="control-label" for="playground-emoji">Icon</label>
+                <div
+                  id="playground-emoji-chips"
+                  class="chip-row chip-row--emoji"
+                  role="group"
+                  aria-label="Quick icons"
+                ></div>
+                <input
+                  id="playground-emoji"
+                  class="field"
+                  name="emoji"
+                  type="text"
+                  maxlength="16"
+                  placeholder="📈"
+                  autocomplete="off"
+                  aria-label="Emoji or icon text"
+                />
+
+                <fieldset class="tag-fieldset">
+                  <legend class="control-label">Stakeholder tags</legend>
+                  <div class="tag-chip-row">
+                    <label class="check check--chip">
+                      <input type="checkbox" name="tags" value="high_school_students" />
+                      High school students
+                    </label>
+                    <label class="check check--chip">
+                      <input type="checkbox" name="tags" value="college_students" />
+                      College students
+                    </label>
+                    <label class="check check--chip">
+                      <input type="checkbox" name="tags" value="parents" />
+                      Parents
+                    </label>
+                    <label class="check check--chip">
+                      <input type="checkbox" name="tags" value="career_counselors" />
+                      Career counselors
+                    </label>
+                    <label class="check check--chip">
+                      <input type="checkbox" name="tags" value="workforce_training_managers" />
+                      Workforce training managers
+                    </label>
+                  </div>
+                </fieldset>
+
+                <div id="playground-error" class="banner banner--error" hidden role="alert"></div>
+
+                <button id="playground-submit" class="submit" type="submit">
+                  Submit to API
+                </button>
+                <p class="form-hint">Channel and title are required to submit.</p>
+              </form>
+            </section>
+
+            <section class="panel playground-code-panel" aria-labelledby="playground-preview-title">
+              <div class="panel-head">
+                <h2 id="playground-preview-title" class="panel-title">Generated fetch()</h2>
+                <div class="panel-actions">
+                  <button type="button" id="playground-copy" class="chip chip--compact">
+                    Copy
+                  </button>
+                </div>
+              </div>
+              <p class="panel-lede">
+                Exact JavaScript an external scraper would use to push this event.
+                Public ingest — <code>Content-Type</code> only, no bearer tokens.
+                Updates live as you type.
+              </p>
+              <pre class="code-block" tabindex="0"><code id="playground-fetch" class="language-js"></code></pre>
+            </section>
+          </div>
+          <div id="playground-toast" class="toast" hidden role="status" aria-live="polite"></div>
+          <p class="footnote">
+            Posts to the configured API origin only. No secrets ship in this page.
+          </p>
+        </section>
+      </main>
     </div>
     <div id="insight-detail" hidden></div>
     <script type="module" src="/src/main.ts"></script>

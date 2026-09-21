@@ -2,7 +2,7 @@
 
 Local feed for career-market events, a **Charts** tab for the same telemetry, a **Market Insights** KPI tab, and a **Playground** tab that posts mock scraper payloads to `POST /api/events`. Logic lives in `src/*.ts` (Playground payload + highlighter in `src/playground.ts`); chart bucketing lives in `src/charts/transforms.ts`; Chart.js lifecycle lives in `src/charts/renderCharts.ts`; presentation lives in `src/styles.css` and the markup in `index.html`.
 
-Brand: void `#05010A`, nebula `#5B2CFF`, corona `#FFB020`, signal `#2EE6A6`, paper `#F5F2EA`.
+Brand (v2 locked): void `#05010A`, nebula `#5B2CFF`, corona `#FFB020`, accretion `#FF4FBF`, signal `#2EE6A6`, paper `#F5F2EA`, mute `#8B8794`. Display **Unbounded ExtraBold**, UI **DM Sans**, data **IBM Plex Mono**. Masthead lockup: `public/logo.png` + HARDCALL + corona tagline *the call that shapes your orbit.* Events hero: `public/banner-celestial.png`. Product name stays out of API routes and status enums.
 
 ## Run locally
 
@@ -21,10 +21,14 @@ npm run build
 
 ## API base
 
-`VITE_EVENTS_API_URL` — API **origin only**, no path. Default: `https://hardcall-api.onrender.com`.
+`VITE_EVENTS_API_URL` — API **origin only** (scheme + host[:port]). Paths, query strings, and non-http(s) values are ignored and the default origin is used. Default: `https://hardcall-api.onrender.com`.
+
+This value is **public**. Vite inlines every `VITE_*` key into the static bundle. Do not put tokens, passwords, or `DATABASE_URL` here. The browser only fetches that configured origin (`/api/events`, `/api/events/stream`, `/api/insights`, `POST /api/events`, `POST /api/insight`).
+
+The API answers CORS with `Access-Control-Allow-Origin: *` (plus `GET,POST,OPTIONS` and `Content-Type`) so a local Vite origin or a later hosted dashboard can read and post. Tighten that header when ingest auth lands.
 
 ```bash
-# live Render API (GET /api/events after that service redeploys this branch)
+# live Render API
 npm run dev
 
 # local API (needs DATABASE_URL) or the in-memory preview server
@@ -33,7 +37,7 @@ VITE_EVENTS_API_URL=http://127.0.0.1:3000 npm run dev
 
 Copy `.env.example` to `.env` if you want the value sticky.
 
-Until Render redeploys **this** commit, production `GET /api/events` is still 404. SSE already exists on the live API. Use a local API for history, or wait for the web service to pick up `GET /api/events`.
+If history 404s, the Render web service has not picked up `GET /api/events` yet. SSE already exists on the live API. Point the dashboard at a local API, or wait for redeploy.
 
 In-memory API (no Postgres) from the repo root:
 
@@ -136,3 +140,11 @@ curl -sS -D - -X POST https://hardcall-api.onrender.com/api/events \
 Expect `HTTP/1.1 201` and JSON with `id` + the same title. The playground Submit button fires this same body.
 
 Bulk synthetic records (BLS/O*NET-style demo, no live keys): `prompts/MOCK_INGESTION_SCRIPT_PROMPT.md` — pointer `scripts/mock-ingest-from-prompt.md`.
+
+## Production checklist
+
+- `VITE_EVENTS_API_URL` is the API **origin only**. It ships in the browser bundle — no secrets.
+- API CORS is open (`*`) this phase. Documented above; restrict when auth exists.
+- `npm --prefix dashboard test && npm --prefix dashboard run build` before a static deploy. Vite copies `public/logo.png`, `public/banner-celestial.png`, and `public/favicon.png` into `dist/`.
+- **Render free migrate caveat:** the API service does not run a release command on free tier. After merge, paste new files from `migrations/` in the Supabase SQL editor and `INSERT INTO schema_migrations (id) VALUES ('…') ON CONFLICT (id) DO NOTHING`, then redeploy the web service. Railway / Fly can run `npm run migrate` on release.
+- Hosted dashboard (Vercel) is still later. Until then, run Vite locally against the live or local API.

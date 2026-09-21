@@ -15,6 +15,7 @@ import {
   type ChartConfiguration,
 } from "chart.js";
 import { CHANNELS, CHANNEL_LABELS, LENS_LABELS, channelLabel } from "../channels";
+import { statusBox } from "../render";
 import type { EventRow, ForecastHorizon, ViewState } from "../types";
 import {
   CHANNEL_COLORS,
@@ -95,7 +96,7 @@ function ensureRegistered(): void {
   );
   Chart.defaults.color = PAPER_DIM;
   Chart.defaults.borderColor = LINE;
-  Chart.defaults.font.family = '"Avenir Next", "Segoe UI", sans-serif';
+  Chart.defaults.font.family = '"DM Sans", Inter, system-ui, sans-serif';
   registered = true;
 }
 
@@ -546,10 +547,7 @@ function barConfig(series: ChannelSeries): ChartConfiguration<"bar"> {
 
 function emptyState(root: HTMLElement, title: string, body: string, error = false): void {
   teardownCharts(root);
-  const box = el("div", error ? "empty empty--error" : "empty");
-  box.append(el("p", "empty__title", title));
-  box.append(el("p", undefined, body));
-  root.append(box);
+  root.append(statusBox(error ? "error" : "empty", body, title));
 }
 
 function makeCanvas(id: string, aria: string): HTMLCanvasElement {
@@ -1014,7 +1012,7 @@ export function renderCharts(
   if (model.loading) {
     teardownCharts(root);
     lastRender = { root, model, now, handlers };
-    root.append(el("p", "empty", "Pulling the latest orbit…"));
+    root.append(statusBox("loading", "Pulling the latest orbit…"));
     return;
   }
   if (model.loadError) {

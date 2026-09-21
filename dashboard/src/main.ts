@@ -42,6 +42,7 @@ import type { AudienceLens, ChartRange, DashboardTab, EventRow, ForecastHorizon,
 import { hrefForState, parseViewState } from "./url-state";
 
 const tabsEl = must("#tabs");
+const heroEl = must("#hero");
 const eventsViewEl = must("#events-view");
 const chartsViewEl = must("#charts-view");
 const chartsHeadingEl = must("#charts-heading");
@@ -140,11 +141,18 @@ function paint(): void {
   eventsViewEl.hidden = model.view.tab !== "events";
   chartsViewEl.hidden = model.view.tab !== "charts";
   chartsHeadingEl.hidden = model.view.tab !== "charts";
+  heroEl.hidden = model.view.tab !== "events";
   chartsDecisionEl.textContent = DECISION_LINE;
   insightsViewEl.hidden = model.view.tab !== "insights";
   playgroundViewEl.hidden = model.view.tab !== "playground";
   eventFiltersEl.hidden =
     model.view.tab === "insights" || model.view.tab === "playground";
+  eventsViewEl.setAttribute("aria-busy", model.loading ? "true" : "false");
+  chartsEl.setAttribute("aria-busy", model.loading ? "true" : "false");
+  insightsEl.setAttribute(
+    "aria-busy",
+    insightsLoading && insights.length === 0 ? "true" : "false"
+  );
   perPageBlockEl.hidden = model.view.tab !== "events";
   renderChannels(channelsEl, model.view, setChannel);
   renderPerPage(perPageEl, model.view, setPerPage);
@@ -447,6 +455,25 @@ const commitSearch = debounce((q: string) => {
 
 searchEl.addEventListener("input", () => {
   commitSearch(searchEl.value.trim());
+});
+
+tabsEl.addEventListener("keydown", (event) => {
+  const keys = ["ArrowLeft", "ArrowRight", "Home", "End"];
+  if (!keys.includes(event.key)) return;
+  const buttons = [...tabsEl.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
+  const current = buttons.findIndex((button) => button === document.activeElement);
+  if (current < 0) return;
+  event.preventDefault();
+  let next = current;
+  if (event.key === "ArrowRight") next = (current + 1) % buttons.length;
+  if (event.key === "ArrowLeft") next = (current - 1 + buttons.length) % buttons.length;
+  if (event.key === "Home") next = 0;
+  if (event.key === "End") next = buttons.length - 1;
+  const target = buttons[next];
+  const tab = target?.dataset.tab as DashboardTab | undefined;
+  if (!tab) return;
+  target.focus();
+  setTab(tab);
 });
 
 document.addEventListener("keydown", (event) => {
