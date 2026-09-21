@@ -71,11 +71,14 @@
         <section id="insights" aria-label="Market insights" aria-live="polite"></section>
         <p class="footnote">
           KPI cards from <code>GET /api/insights</code>, newest <code>updated_at</code> first.
-          The dashboard polls every 15 seconds. Publish or refresh a card with
-          <code>POST /api/insight</code> (exact title upsert).
+          Click a card (or press Enter / Space) to open its analysis. The dashboard polls every
+          15 seconds. Deep-link a tile with <code>?tab=insights&amp;insight=&lt;id&gt;</code>.
+          Publish or refresh a card with <code>POST /api/insight</code> (exact title upsert;
+          optional <code>detail</code>).
         </p>
       </div>
     </div>
+    <div id="insight-detail" hidden></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

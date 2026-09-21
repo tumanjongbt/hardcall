@@ -2,9 +2,11 @@ import { fetchEvents, fetchInsights, subscribeEvents } from "./api";
 import { INSIGHTS_POLL_MS, SEARCH_DEBOUNCE_MS } from "./config";
 import { debounce } from "./debounce";
 import { filterEvents, paginate } from "./query";
+import { findInsight } from "./insights";
 import {
   renderChannels,
   renderFeed,
+  renderInsightDetail,
   renderInsights,
   renderInsightsMeta,
   renderMeta,
@@ -28,6 +30,7 @@ const feedEl = must("#feed");
 const paginationEl = must("#pagination");
 const insightsEl = must("#insights");
 const insightsMetaEl = must("#insights-meta");
+const insightDetailEl = must("#insight-detail");
 
 let allEvents: EventRow[] = [];
 let insights: InsightRow[] = [];
@@ -72,6 +75,7 @@ function insightsModel() {
     loading: insightsLoading,
     loadError: insightsError,
     lastLoadedAt: insightsLoadedAt,
+    openId: view.tab === "insights" ? view.insight : null,
   };
 }
 
@@ -86,8 +90,13 @@ function paint(): void {
   renderMeta(metaEl, model);
   renderFeed(feedEl, model);
   renderPagination(paginationEl, model, setPage);
-  renderInsights(insightsEl, insightsModel());
+  renderInsights(insightsEl, insightsModel(), toggleInsight);
   renderInsightsMeta(insightsMetaEl, insightsModel());
+  renderInsightDetail(
+    insightDetailEl,
+    view.tab === "insights" ? findInsight(insights, view.insight) : null,
+    closeInsight
+  );
   if (searchEl.value !== model.view.q && document.activeElement !== searchEl) {
     searchEl.value = model.view.q;
   }
@@ -101,7 +110,25 @@ function pushView(next: ViewState): void {
 
 function setTab(tab: DashboardTab): void {
   if (view.tab === tab) return;
-  pushView({ ...view, tab });
+  pushView({ ...view, tab, insight: tab === "insights" ? view.insight : null });
+}
+
+function toggleInsight(id: string): void {
+  if (view.insight === id) {
+    closeInsight();
+    return;
+  }
+  pushView({ ...view, tab: "insights", insight: id });
+}
+
+function closeInsight(): void {
+  if (!view.insight) return;
+  const id = view.insight;
+  pushView({ ...view, insight: null });
+  const card = insightsEl.querySelector<HTMLButtonElement>(
+    `[data-insight-id="${CSS.escape(id)}"] .kpi-card, button.kpi-card[data-insight-id="${CSS.escape(id)}"]`
+  );
+  card?.focus();
 }
 
 function setChannel(channel: string | null): void {
@@ -126,6 +153,13 @@ const commitSearch = debounce((q: string) => {
 
 searchEl.addEventListener("input", () => {
   commitSearch(searchEl.value.trim());
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && view.insight) {
+    event.preventDefault();
+    closeInsight();
+  }
 });
 
 window.addEventListener("popstate", () => {
@@ -186,6 +220,10 @@ async function loadInsights(): Promise<void> {
   try {
     insights = await fetchInsights();
     insightsLoadedAt = new Date().toISOString();
+    if (view.insight && !findInsight(insights, view.insight)) {
+      view = { ...view, insight: null };
+      history.replaceState(view, "", hrefForState(view, location.pathname));
+    }
   } catch (err) {
     if (!hadRows) insights = [];
     insightsError = errorMessage(err, "insights");

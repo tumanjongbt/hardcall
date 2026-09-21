@@ -36,6 +36,7 @@ function mapInsightRow(row: {
   id: string;
   title: string;
   value: string;
+  detail: string;
   created_at: Date | string;
   updated_at: Date | string;
 }): InsightRow {
@@ -43,6 +44,7 @@ function mapInsightRow(row: {
     id: row.id,
     title: row.title,
     value: row.value,
+    detail: row.detail ?? "",
     created_at: toIso(row.created_at),
     updated_at: toIso(row.updated_at),
   };
@@ -71,14 +73,16 @@ export function createPgStore(pool: Pool): Store {
       return rows.map(mapRow);
     },
     async upsertInsight(value: CreateInsight): Promise<{ row: InsightRow; created: boolean }> {
+      const detail = value.detail === undefined ? null : value.detail;
       const { rows } = await pool.query(
-        `INSERT INTO insights (title, value)
-         VALUES ($1, $2)
+        `INSERT INTO insights (title, value, detail)
+         VALUES ($1, $2, COALESCE($3, ''))
          ON CONFLICT (title) DO UPDATE
            SET value = EXCLUDED.value,
+               detail = COALESCE($3, insights.detail),
                updated_at = now()
-         RETURNING id, title, value, created_at, updated_at, (xmax = 0) AS inserted`,
-        [value.title, value.value]
+         RETURNING id, title, value, detail, created_at, updated_at, (xmax = 0) AS inserted`,
+        [value.title, value.value, detail]
       );
       const row = rows[0];
       return {
@@ -88,7 +92,7 @@ export function createPgStore(pool: Pool): Store {
     },
     async listInsights(): Promise<InsightRow[]> {
       const { rows } = await pool.query(
-        `SELECT id, title, value, created_at, updated_at
+        `SELECT id, title, value, detail, created_at, updated_at
          FROM insights
          ORDER BY updated_at DESC, title ASC`
       );

@@ -12,7 +12,7 @@ npm install
 npm run dev
 ```
 
-Open the Vite URL (default `http://127.0.0.1:5173`). The Events tab reads history from `GET {API}/api/events` and listens on `GET {API}/api/events/stream`. The Market Insights tab polls `GET {API}/api/insights` on mount and every **15 seconds**.
+Open the Vite URL (default `http://127.0.0.1:5173`). The Events tab reads history from `GET {API}/api/events` and listens on `GET {API}/api/events/stream`. The Market Insights tab polls `GET {API}/api/insights` on mount and every **15 seconds**. KPI cards are buttons: click (or Enter / Space) opens a side drawer with that tile’s `detail` analysis. Esc or Close returns to the grid. An open drawer stays open across the 15s poll and updates in place if that id is still present.
 
 ```bash
 npm test
@@ -50,13 +50,14 @@ These query keys are written with `history.pushState` when a person changes filt
 
 | key | default | meaning |
 | --- | --- | --- |
-| `tab` | omitted (`events`) | `events` or `insights` |
+| `tab` | omitted (`events`) | `events` or `insights` (`insight=` also opens Market Insights) |
 | `page` | `1` | 1-based page |
 | `perPage` | `50` | `50`, `100`, or `all` |
 | `channel` | omitted | `university` · `community_college` · `trade` · `apprenticeship` · `automation` |
 | `q` | omitted | search over title, description, tags (300ms debounce) |
+| `insight` | omitted | insight id; opens the analysis drawer on the Market Insights tab |
 
-Example: `/?page=2&perPage=50&channel=trade&q=welding` · `/?tab=insights`
+Example: `/?page=2&perPage=50&channel=trade&q=welding` · `/?tab=insights` · `/?tab=insights&insight=<id>`
 
 Reload restores the same view. Changing channel, search, or per-page resets `page` to `1`.
 
@@ -79,10 +80,16 @@ node cli/src/events.js push \
 
 The new card should slide/flash in at the top of page 1 when it matches the current filter.
 
-6. **Market Insights tab** — switch to Market Insights (`?tab=insights`). KPI cards should appear (empty until `POST /api/insight`). Wait ~15s or POST a new/updated title and confirm the grid refreshes on the next poll.
+6. **Market Insights tab** — switch to Market Insights (`?tab=insights`). KPI cards should appear (empty until `POST /api/insight`). Click a card: the drawer shows title, KPI value, and `detail` (or “No analysis yet for this insight.”). Esc / Close returns to the grid. Reload `?tab=insights&insight=<id>` should reopen that tile. Wait ~15s or POST a new/updated title and confirm the grid refreshes on the next poll without closing an open drawer.
 
 ```bash
 curl -sS -X POST http://127.0.0.1:3000/api/insight \
   -H 'Content-Type: application/json' \
-  -d '{ "title": "Top Trade Income Growth", "value": "+18%" }'
+  -d '{ "title": "Top Trade Income Growth", "value": "+18%", "detail": "Electricians and HVAC still lead wage growth." }'
+```
+
+After Bernard pastes `migrations/003_insights_detail.sql` in Supabase, seed analysis for the eight live KPI titles:
+
+```bash
+EVENTS_API_URL=https://hardcall-api.onrender.com node scripts/seed-insight-details.js
 ```

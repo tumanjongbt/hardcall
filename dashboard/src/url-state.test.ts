@@ -16,9 +16,12 @@ test("parseViewState reads bookmark query keys", () => {
       perPage: 50,
       channel: "trade",
       q: "welding",
+      insight: null,
     }
   );
   assert.equal(parseViewState("?tab=insights").tab, "insights");
+  assert.deepEqual(parseViewState("?tab=insights&insight=abc-1").insight, "abc-1");
+  assert.equal(parseViewState("?insight=abc-1").tab, "insights");
 });
 
 test("parseViewState restores defaults and ignores unknown channels", () => {
@@ -29,6 +32,7 @@ test("parseViewState restores defaults and ignores unknown channels", () => {
     perPage: 50,
     channel: null,
     q: "",
+    insight: null,
   });
   assert.equal(parseViewState("?perPage=100").perPage, 100);
   assert.equal(parseViewState("?perPage=all").perPage, "all");
@@ -41,6 +45,7 @@ test("serializeViewState writes page, perPage, channel, and q", () => {
     perPage: 50,
     channel: "trade",
     q: "welding",
+    insight: null,
   });
   assert.equal(qs, "page=2&perPage=50&channel=trade&q=welding");
   assert.equal(
@@ -50,6 +55,7 @@ test("serializeViewState writes page, perPage, channel, and q", () => {
       perPage: 100,
       channel: null,
       q: "",
+      insight: null,
     }),
     "/?page=1&perPage=100"
   );
@@ -60,7 +66,19 @@ test("serializeViewState writes page, perPage, channel, and q", () => {
       perPage: 50,
       channel: null,
       q: "",
+      insight: null,
     }),
     "/?tab=insights&page=1&perPage=50"
+  );
+  assert.equal(
+    hrefForState({
+      tab: "insights",
+      page: 1,
+      perPage: 50,
+      channel: null,
+      q: "",
+      insight: "abc-1",
+    }),
+    "/?tab=insights&page=1&perPage=50&insight=abc-1"
   );
 });

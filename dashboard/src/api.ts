@@ -9,7 +9,13 @@ export function parseInsightsPayload(body: unknown): InsightRow[] {
   if (!Array.isArray(insights)) {
     throw new Error("invalid_insights_payload");
   }
-  return insights as InsightRow[];
+  return insights.map((row) => {
+    const rec = row as InsightRow;
+    return {
+      ...rec,
+      detail: typeof rec.detail === "string" ? rec.detail : "",
+    };
+  });
 }
 
 export async function fetchEvents(base = apiBase()): Promise<EventRow[]> {

@@ -47,9 +47,19 @@ const FIXTURES: CreateEvent[] = [
 ];
 
 const INSIGHT_FIXTURES: CreateInsight[] = [
-  { title: "Top Trade Income Growth", value: "+18%" },
+  {
+    title: "Top Trade Income Growth",
+    value: "+18%",
+    detail:
+      "Licensed electricians and HVAC techs are still the fastest wage growers in this metro.\nCounselors: keep a waitlist and pair night cohorts with paid helpers.",
+  },
   { title: "Apprenticeship Placement Rate", value: "91%" },
-  { title: "University 4-year ROI", value: "+6%" },
+  {
+    title: "University 4-year ROI",
+    value: "+6%",
+    detail:
+      "Bachelor's ROI is still positive here, but slower than short-path trades and cert stacks.\nAsk families to price net tuition, not sticker.",
+  },
   { title: "Automation Displacement Risk", value: "−12%" },
 ];
 
@@ -83,6 +93,7 @@ function createMemoryStore(
       const now = new Date().toISOString();
       if (existing) {
         existing.value = value.value;
+        if (value.detail !== undefined) existing.detail = value.detail;
         existing.updated_at = now;
         return { row: { ...existing }, created: false };
       }
@@ -90,6 +101,7 @@ function createMemoryStore(
         id: crypto.randomUUID(),
         title: value.title,
         value: value.value,
+        detail: value.detail ?? "",
         created_at: now,
         updated_at: now,
       };
@@ -143,6 +155,7 @@ function seedInsights(): InsightRow[] {
     id: `22222222-0000-4000-8000-${String(i + 1).padStart(12, "0")}`,
     title: value.title,
     value: value.value,
+    detail: value.detail ?? "",
     created_at: new Date(start).toISOString(),
     updated_at: new Date(start + i * 60_000).toISOString(),
   }));

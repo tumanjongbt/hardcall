@@ -1,5 +1,5 @@
 import { CHANNELS, CHANNEL_LABELS, channelLabel, tagLabel } from "./channels";
-import { insightTone } from "./insights";
+import { insightDetailBody, insightTone } from "./insights";
 import type { DashboardTab, EventRow, InsightRow, StreamStatus, ViewState } from "./types";
 
 export type FeedModel = {
@@ -165,6 +165,7 @@ export type InsightsModel = {
   loading: boolean;
   loadError: string | null;
   lastLoadedAt: string | null;
+  openId: string | null;
 };
 
 export function renderTabs(
@@ -188,7 +189,11 @@ export function renderTabs(
   }
 }
 
-export function renderInsights(root: HTMLElement, model: InsightsModel): void {
+export function renderInsights(
+  root: HTMLElement,
+  model: InsightsModel,
+  onOpen?: (id: string) => void
+): void {
   root.replaceChildren();
   if (model.loading && model.insights.length === 0) {
     root.append(el("p", "empty", "Pulling market signals…"));
@@ -210,21 +215,106 @@ export function renderInsights(root: HTMLElement, model: InsightsModel): void {
 
   const grid = el("ul", "kpi-grid");
   for (const insight of model.insights) {
-    grid.append(renderKpiCard(insight));
+    grid.append(renderKpiCard(insight, model.openId, onOpen));
   }
   root.append(grid);
 }
 
-function renderKpiCard(insight: InsightRow): HTMLLIElement {
+function renderKpiCard(
+  insight: InsightRow,
+  openId: string | null,
+  onOpen?: (id: string) => void
+): HTMLLIElement {
   const tone = insightTone(insight.value);
-  const card = el("li", `kpi-card kpi-card--${tone}`);
+  const item = el("li", "kpi-grid__item");
+  item.dataset.insightId = insight.id;
+
+  const card = el("button", `kpi-card kpi-card--${tone}`);
+  card.type = "button";
   card.dataset.insightId = insight.id;
+  card.setAttribute("aria-haspopup", "dialog");
+  card.setAttribute("aria-controls", "insight-drawer");
+  const open = openId === insight.id;
+  card.setAttribute("aria-expanded", open ? "true" : "false");
+  if (open) card.classList.add("is-open");
   card.append(el("p", "kpi-card__title", insight.title));
   card.append(el("p", "kpi-card__value", insight.value));
   const time = el("time", "kpi-card__when", `Updated ${formatWhen(insight.updated_at)}`);
   time.dateTime = insight.updated_at;
   card.append(time);
-  return card;
+  if (onOpen) {
+    card.addEventListener("click", () => onOpen(insight.id));
+  }
+  item.append(card);
+  return item;
+}
+
+export function renderInsightDetail(
+  root: HTMLElement,
+  insight: InsightRow | null,
+  onClose: () => void
+): void {
+  if (!insight) {
+    root.hidden = true;
+    root.replaceChildren();
+    delete root.dataset.insightId;
+    document.body.classList.remove("has-insight-detail");
+    return;
+  }
+
+  document.body.classList.add("has-insight-detail");
+  root.hidden = false;
+  const body = insightDetailBody(insight.detail);
+  const sameOpen = root.dataset.insightId === insight.id && root.querySelector("#insight-drawer");
+
+  if (sameOpen) {
+    const title = root.querySelector("#insight-detail-title");
+    const value = root.querySelector(".insight-drawer__value");
+    const detail = root.querySelector(".insight-drawer__detail");
+    const when = root.querySelector<HTMLTimeElement>(".insight-drawer__when");
+    if (title) title.textContent = insight.title;
+    if (value) value.textContent = insight.value;
+    if (detail) {
+      detail.classList.toggle("is-empty", body.empty);
+      detail.textContent = body.text;
+    }
+    if (when) {
+      when.dateTime = insight.updated_at;
+      when.textContent = `Updated ${formatWhen(insight.updated_at)}`;
+    }
+    return;
+  }
+
+  root.dataset.insightId = insight.id;
+  root.replaceChildren();
+
+  const backdrop = el("div", "insight-backdrop");
+  backdrop.addEventListener("click", (event) => {
+    if (event.target === backdrop) onClose();
+  });
+
+  const drawer = el("div", "insight-drawer");
+  drawer.id = "insight-drawer";
+  drawer.setAttribute("role", "dialog");
+  drawer.setAttribute("aria-modal", "true");
+  drawer.setAttribute("aria-labelledby", "insight-detail-title");
+
+  const close = el("button", "insight-drawer__close", "Close");
+  close.type = "button";
+  close.addEventListener("click", onClose);
+
+  const title = el("h2", "insight-drawer__title", insight.title);
+  title.id = "insight-detail-title";
+  const value = el("p", "insight-drawer__value", insight.value);
+  const when = el("time", "insight-drawer__when", `Updated ${formatWhen(insight.updated_at)}`);
+  when.dateTime = insight.updated_at;
+  const detail = el("p", "insight-drawer__detail", body.text);
+  if (body.empty) detail.classList.add("is-empty");
+
+  drawer.append(close, title, value, when, detail);
+  backdrop.append(drawer);
+  root.append(backdrop);
+  close.focus();
 }
 
 export function renderInsightsMeta(root: HTMLElement, model: InsightsModel): void {
