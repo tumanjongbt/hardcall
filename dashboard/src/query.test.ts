@@ -48,6 +48,19 @@ test("filterEvents applies channel and searches title, description, tags", () =>
   assert.deepEqual(filterEvents(rows, "automation", "welding"), []);
 });
 
+test("filterEvents audience lens keeps stakeholder tags", () => {
+  assert.deepEqual(
+    filterEvents(rows, null, "", "parents").map((e) => e.id),
+    ["2", "3"]
+  );
+  assert.deepEqual(
+    filterEvents(rows, null, "", "students").map((e) => e.id),
+    ["1", "2"]
+  );
+  assert.deepEqual(filterEvents(rows, "trade", "", "students").map((e) => e.id), ["1"]);
+  assert.deepEqual(filterEvents(rows, null, "", "workforce"), []);
+});
+
 test("paginate defaults to 50-sized pages and supports 100 and all", () => {
   const many = Array.from({ length: 120 }, (_, i) => i);
   const page1 = paginate(many, 1, 50);

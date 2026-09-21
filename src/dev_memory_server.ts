@@ -118,7 +118,6 @@ function createMemoryStore(
 }
 
 function seedRows(): EventRow[] {
-  const start = Date.parse("2026-09-01T12:00:00.000Z");
   const extras: EventRow[] = [];
   const channels = [
     "university",
@@ -127,22 +126,35 @@ function seedRows(): EventRow[] {
     "apprenticeship",
     "automation",
   ] as const;
-  for (let i = 0; i < 70; i += 1) {
+  const tagCycle = [
+    ["high_school_students"],
+    ["college_students"],
+    ["parents"],
+    ["career_counselors"],
+    ["workforce_training_managers"],
+    ["high_school_students", "parents"],
+    ["college_students", "career_counselors"],
+    ["parents", "workforce_training_managers"],
+  ];
+  for (let i = 0; i < 180; i += 1) {
     const channel = channels[i % channels.length];
+    const dayOffset = i % 90;
     extras.push({
       id: `00000000-0000-4000-8000-${String(i + 1).padStart(12, "0")}`,
       channel,
       title: `Seed signal ${i + 1}: ${channel.replaceAll("_", " ")}`,
       description: i % 3 === 0 ? `Fixture description ${i + 1}` : null,
       emoji: i % 4 === 0 ? "✨" : null,
-      tags: i % 2 === 0 ? ["parents"] : ["career_counselors"],
-      created_at: new Date(start + i * 3_600_000).toISOString(),
+      tags: tagCycle[i % tagCycle.length],
+      created_at: new Date(
+        Date.UTC(2026, 8, 21 - dayOffset, 8 + (i % 9), (i * 11) % 60, 0)
+      ).toISOString(),
     });
   }
   const fixtures: EventRow[] = FIXTURES.map((value, i) => ({
     id: `11111111-0000-4000-8000-${String(i + 1).padStart(12, "0")}`,
     ...value,
-    created_at: new Date(start + (80 + i) * 3_600_000).toISOString(),
+    created_at: new Date(Date.UTC(2026, 8, 21 - (i % 6), 16, i * 5, 0)).toISOString(),
   }));
   return [...extras, ...fixtures];
 }

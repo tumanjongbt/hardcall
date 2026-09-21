@@ -34,7 +34,7 @@ body {
 }
 
 .sky {
-  width: min(1100px, calc(100% - 32px));
+  width: min(1180px, calc(100% - 32px));
   margin: 0 auto;
   padding: 36px 0 72px;
 }
@@ -574,12 +574,37 @@ body.has-insight-detail {
 }
 
 .chart-panel__title {
-  margin: 0 0 12px;
+  margin: 0 0 8px;
   font-family: "Avenir Next", "Segoe UI", sans-serif;
   font-size: 0.78rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--paper-dim);
+}
+
+.chart-panel__informs {
+  margin: 0 0 12px;
+  color: var(--paper-dim);
+  font-size: 0.92rem;
+}
+
+.chart-panel__informs strong {
+  color: var(--corona);
+  font-weight: 650;
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.chart-panel__caption {
+  margin: 12px 0 0;
+  color: var(--paper-dim);
+  font-size: 0.9rem;
+}
+
+.chart-panel--wide {
+  margin-bottom: 14px;
 }
 
 .chart-canvas-wrap {
@@ -595,6 +620,131 @@ body.has-insight-detail {
 
 .chart-canvas-wrap--bar {
   height: 220px;
+}
+
+.chart-canvas-wrap.is-muted {
+  opacity: 0.35;
+}
+
+.chart-filters {
+  display: grid;
+  gap: 16px;
+}
+
+.chart-filter {
+  margin: 0;
+  border: 0;
+  padding: 0;
+  min-inline-size: 0;
+}
+
+.chart-filter legend.control-label {
+  padding: 0;
+  margin-bottom: 8px;
+}
+
+.chart-filter__hint {
+  margin: 8px 0 0;
+  color: var(--paper-dim);
+  font-size: 0.88rem;
+}
+
+.non-advisory {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  align-items: flex-start;
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--corona);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--corona) 12%, var(--void));
+}
+
+.non-advisory__chip {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--corona);
+  background: color-mix(in srgb, var(--corona) 22%, var(--void));
+  color: var(--corona);
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.non-advisory__text {
+  flex: 1 1 16rem;
+  color: var(--paper);
+  font-size: 0.92rem;
+}
+
+.resilience-meter {
+  height: 10px;
+  margin-top: 12px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--void) 45%, transparent);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+
+.resilience-meter__fill {
+  height: 100%;
+  width: 0;
+  background: var(--signal);
+}
+
+.heat-host,
+.data-view-host {
+  overflow-x: auto;
+}
+
+.heat-table,
+.data-view {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-size: 0.88rem;
+}
+
+.heat-table caption,
+.data-view caption {
+  caption-side: bottom;
+  text-align: left;
+  padding-top: 8px;
+  color: var(--paper-dim);
+  font-size: 0.8rem;
+}
+
+.heat-table th,
+.heat-table td,
+.data-view th,
+.data-view td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+
+.heat-table th[scope="col"],
+.heat-table td {
+  text-align: center;
+  min-width: 2.6rem;
+}
+
+.heat-cell {
+  font-variant-numeric: tabular-nums;
+}
+
+.data-view__so-what {
+  color: color-mix(in srgb, var(--paper) 86%, var(--void));
+}
+
+.data-view__delta {
+  font-variant-numeric: tabular-nums;
+  color: var(--signal);
 }
 
 @media (max-width: 720px) {

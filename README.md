@@ -177,7 +177,7 @@ cd dashboard
 VITE_EVENTS_API_URL=http://127.0.0.1:3000 npm run dev
 ```
 
-The Events tab stays reverse-chronological, listens on SSE, filters by channel, debounces search by 300ms, paginates (50 / 100 / all), and writes `page`, `perPage`, `channel`, and `q` into the URL for bookmarking. The Charts tab (`?tab=charts`) aggregates that same filtered event store (line / doughnut / per-channel bars). The Market Insights tab polls `GET /api/insights` on mount and every **15 seconds** (`?tab=insights`). Click a KPI card to open that topic’s analysis (Esc or Close returns to the grid). Counselors can deep-link `?tab=insights&insight=<id>`.
+The Events tab stays reverse-chronological, listens on SSE, filters by channel, debounces search by 300ms, paginates (50 / 100 / all), and writes `page`, `perPage`, `channel`, and `q` into the URL for bookmarking. The Charts tab (`?tab=charts`) aggregates that same filtered event store with an audience lens, 7/14/30/90-day history, a 14/30-day forecast band (always labeled **Not advice**), path compare, stacked mix, automation resilience, and a scannable data view. The Market Insights tab polls `GET /api/insights` on mount and every **15 seconds** (`?tab=insights`). Click a KPI card to open that topic’s analysis (Esc or Close returns to the grid). Counselors can deep-link `?tab=insights&insight=<id>`.
 
 ### `events` CLI
 

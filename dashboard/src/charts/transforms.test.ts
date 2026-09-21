@@ -5,10 +5,21 @@ import type { EventRow } from "../types";
 import {
   WINDOW_DAYS,
   activeChannels,
+  automationSplit,
   channelDistribution,
+  channelRanks,
+  channelWeekdayHeat,
   chartDataFromEvents,
   dailyActivity,
+  eventsInRange,
+  formatDeltaLabel,
+  detectSpikes,
+  forecastBand,
+  futureDayKeys,
   lastDayKeys,
+  pathCompare,
+  stackedDaily,
+  stakeholderBreakdown,
 } from "./transforms";
 
 const now = new Date("2026-09-21T15:00:00.000Z");
@@ -42,9 +53,21 @@ const rows: EventRow[] = [
     tags: ["high_school_students"],
   }),
   row("t2", "trade", "2026-09-21T11:00:00.000Z", { title: "HVAC demand" }),
-  row("c1", "community_college", "2026-09-10T00:00:00.000Z"),
-  row("a1", "apprenticeship", "2026-09-01T00:00:00.000Z"),
-  row("m1", "automation", "2026-09-05T00:00:00.000Z"),
+  row("c1", "community_college", "2026-09-10T00:00:00.000Z", {
+    tags: ["career_counselors"],
+  }),
+  row("a1", "apprenticeship", "2026-09-01T00:00:00.000Z", {
+    tags: ["parents", "high_school_students"],
+  }),
+  row("m1", "automation", "2026-09-05T00:00:00.000Z", {
+    tags: ["workforce_training_managers"],
+  }),
+  row("u2", "university", "2026-09-18T09:00:00.000Z", {
+    tags: ["college_students", "parents"],
+  }),
+  row("t3", "trade", "2026-09-14T12:00:00.000Z", {
+    tags: ["career_counselors"],
+  }),
 ];
 
 test("lastDayKeys yields 30 UTC days ending today", () => {
@@ -52,6 +75,20 @@ test("lastDayKeys yields 30 UTC days ending today", () => {
   assert.equal(keys.length, 30);
   assert.equal(keys[0], "2026-08-23");
   assert.equal(keys[keys.length - 1], "2026-09-21");
+});
+
+test("lastDayKeys supports 7, 14, and 90 day presets", () => {
+  const week = lastDayKeys(now, 7);
+  assert.equal(week.length, 7);
+  assert.equal(week[0], "2026-09-15");
+  assert.equal(week[6], "2026-09-21");
+  const fortnight = lastDayKeys(now, 14);
+  assert.equal(fortnight.length, 14);
+  assert.equal(fortnight[0], "2026-09-08");
+  const hist90 = lastDayKeys(now, 90);
+  assert.equal(hist90.length, 90);
+  assert.equal(hist90[0], "2026-06-24");
+  assert.equal(hist90[89], "2026-09-21");
 });
 
 test("dailyActivity buckets last 30 days and ignores older events", () => {
@@ -65,7 +102,21 @@ test("dailyActivity buckets last 30 days and ignores older events", () => {
   assert.equal(today?.count, 2);
   assert.equal(
     buckets.reduce((sum, bucket) => sum + bucket.count, 0),
-    6
+    8
+  );
+});
+
+test("eventsInRange and dailyActivity honor a 7-day window", () => {
+  const week = eventsInRange(rows, now, 7);
+  assert.deepEqual(
+    week.map((event) => event.id).sort(),
+    ["t1", "t2", "u2"]
+  );
+  const buckets = dailyActivity(rows, now, 7);
+  assert.equal(buckets.length, 7);
+  assert.equal(
+    buckets.reduce((sum, bucket) => sum + bucket.count, 0),
+    3
   );
 });
 
@@ -76,13 +127,13 @@ test("channelDistribution uses friendly labels and percents across all five chan
     ["University", "Community College", "Trade", "Apprenticeship", "Automation"]
   );
   const byChannel = Object.fromEntries(slices.map((slice) => [slice.channel, slice]));
-  assert.equal(byChannel.university?.count, 2);
-  assert.equal(byChannel.trade?.count, 2);
+  assert.equal(byChannel.university?.count, 3);
+  assert.equal(byChannel.trade?.count, 3);
   assert.equal(byChannel.community_college?.count, 1);
   assert.equal(byChannel.apprenticeship?.count, 1);
   assert.equal(byChannel.automation?.count, 1);
-  assert.equal(byChannel.university?.percent, (2 / 7) * 100);
-  assert.equal(byChannel.trade?.percent, (2 / 7) * 100);
+  assert.equal(byChannel.university?.percent, (3 / 9) * 100);
+  assert.equal(byChannel.trade?.percent, (3 / 9) * 100);
 });
 
 test("charts recompute from the same channel + search subset as the feed", () => {
@@ -110,6 +161,29 @@ test("charts recompute from the same channel + search subset as the feed", () =>
   assert.equal(data.byChannel[0]?.buckets[data.byChannel[0].buckets.length - 1]?.count, 1);
 });
 
+test("audience lens filters stakeholder tags before chart aggregates", () => {
+  const parents = filterEvents(rows, null, "", "parents");
+  assert.deepEqual(
+    parents.map((event) => event.id).sort(),
+    ["a1", "u2"]
+  );
+  const students = filterEvents(rows, null, "", "students");
+  assert.ok(students.some((event) => event.id === "t1"));
+  assert.ok(students.some((event) => event.id === "u1"));
+  assert.ok(students.some((event) => event.id === "u2"));
+  assert.ok(!students.some((event) => event.id === "c1"));
+  const data = chartDataFromEvents(parents, now, { days: 30 });
+  assert.equal(data.inRangeCount, 2);
+  assert.equal(
+    data.distribution.find((slice) => slice.channel === "university")?.count,
+    1
+  );
+  assert.equal(
+    data.distribution.find((slice) => slice.channel === "apprenticeship")?.count,
+    1
+  );
+});
+
 test("activeChannels is the channel filter, or all five when unfiltered", () => {
   assert.deepEqual(activeChannels(rows, "automation"), ["automation"]);
   assert.deepEqual(activeChannels(rows, null), [
@@ -119,4 +193,149 @@ test("activeChannels is the channel filter, or all five when unfiltered", () => 
     "apprenticeship",
     "automation",
   ]);
+});
+
+test("stackedDaily composition sums to the activity line each day", () => {
+  const stacked = stackedDaily(rows, now, 30);
+  const activity = dailyActivity(rows, now, 30);
+  assert.equal(stacked.length, activity.length);
+  for (let i = 0; i < stacked.length; i += 1) {
+    const day = stacked[i];
+    const sum = day
+      ? Object.values(day.counts).reduce((total, count) => total + count, 0)
+      : 0;
+    assert.equal(sum, activity[i]?.count);
+  }
+  const today = stacked[stacked.length - 1];
+  assert.equal(today?.counts.trade, 2);
+  assert.equal(today?.counts.university, 0);
+});
+
+test("stakeholderBreakdown counts multi-tag events in each matching audience", () => {
+  const slices = stakeholderBreakdown(eventsInRange(rows, now, 30));
+  const byTag = Object.fromEntries(slices.map((slice) => [slice.tag, slice]));
+  assert.equal(byTag.high_school_students?.count, 2);
+  assert.equal(byTag.college_students?.count, 2);
+  assert.equal(byTag.parents?.count, 2);
+  assert.equal(byTag.career_counselors?.count, 2);
+  assert.equal(byTag.workforce_training_managers?.count, 1);
+  assert.equal(byTag.parents?.label, "Parents");
+});
+
+test("channelWeekdayHeat is UTC weekday × channel", () => {
+  const heat = channelWeekdayHeat(rows, now, 7);
+  assert.deepEqual([...heat.weekdays], ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]);
+  const trade = heat.rows.find((rowItem) => rowItem.channel === "trade");
+  // 2026-09-21 is a Monday (UTC)
+  assert.equal(trade?.cells[1], 2);
+  const uni = heat.rows.find((rowItem) => rowItem.channel === "university");
+  // 2026-09-18 is a Friday
+  assert.equal(uni?.cells[5], 1);
+  assert.ok(heat.max >= 2);
+});
+
+test("automationSplit groups automation vs the four human paths", () => {
+  const split = automationSplit(eventsInRange(rows, now, 30));
+  assert.equal(split.automation, 1);
+  assert.equal(split.human, 7);
+  assert.equal(split.total, 8);
+  assert.equal(split.automationPercent, (1 / 8) * 100);
+  assert.equal(split.humanPercent, (7 / 8) * 100);
+});
+
+test("pathCompare dual series answers which path is drawing more signal", () => {
+  const compare = pathCompare(rows, now, 7, ["trade", "university"]);
+  assert.ok(compare);
+  assert.equal(compare.a.channel, "trade");
+  assert.equal(compare.b.channel, "university");
+  assert.equal(compare.totalA, 2);
+  assert.equal(compare.totalB, 1);
+  assert.equal(compare.leader, "trade");
+  assert.equal(pathCompare(rows, now, 7, ["trade"]), null);
+  assert.equal(pathCompare(rows, now, 7, ["trade", "trade"]), null);
+});
+
+test("formatDeltaLabel covers flat, new, and percent change", () => {
+  assert.equal(formatDeltaLabel(0, 0), "flat");
+  assert.equal(formatDeltaLabel(4, 0), "new");
+  assert.equal(formatDeltaLabel(4, 2), "+100%");
+  assert.equal(formatDeltaLabel(1, 2), "-50%");
+  assert.equal(formatDeltaLabel(10, 10), "flat");
+});
+
+test("channelRanks include share, dod/wow when computable, and a so-what", () => {
+  const ranks = channelRanks(rows, now, 30);
+  assert.equal(ranks[0]?.channel, "trade");
+  assert.equal(ranks[0]?.count, 3);
+  assert.ok(ranks[0]?.soWhat.includes("Hands-on"));
+  const seven = channelRanks(rows, now, 7);
+  assert.equal(seven.find((rowItem) => rowItem.channel === "trade")?.wowLabel, "—");
+  const thirtyTrade = ranks.find((rowItem) => rowItem.channel === "trade");
+  assert.equal(thirtyTrade?.dodLabel, "new");
+  assert.notEqual(thirtyTrade?.wowLabel, "—");
+});
+
+test("chartDataFromEvents wires range, compare, and in-window doughnut together", () => {
+  const data = chartDataFromEvents(rows, now, {
+    days: 7,
+    compare: ["trade", "university"],
+    horizon: 14,
+  });
+  assert.equal(data.days, 7);
+  assert.equal(data.horizon, 14);
+  assert.equal(data.inRangeCount, 3);
+  assert.equal(data.activity.length, 7);
+  assert.equal(data.stacked.length, 7);
+  assert.equal(data.compare?.leader, "trade");
+  assert.equal(
+    data.distribution.find((slice) => slice.channel === "trade")?.count,
+    2
+  );
+  assert.equal(
+    data.distribution.find((slice) => slice.channel === "apprenticeship")?.count,
+    0
+  );
+  assert.equal(data.ranks.length, 5);
+  assert.equal(data.forecast.points.length, 14);
+  assert.equal(data.forecast.points[0]?.key, "2026-09-22");
+  assert.equal(data.split.resilienceScore, data.split.humanPercent);
+});
+
+test("forecastBand is 14 or 30 UTC days after today and stays non-negative", () => {
+  const keys = futureDayKeys(now, 14);
+  assert.equal(keys.length, 14);
+  assert.equal(keys[0], "2026-09-22");
+  assert.equal(keys[13], "2026-10-05");
+  const activity = dailyActivity(rows, now, 30);
+  const band14 = forecastBand(activity, now, 14);
+  const band30 = forecastBand(activity, now, 30);
+  assert.equal(band14.points.length, 14);
+  assert.equal(band30.points.length, 30);
+  for (const point of band30.points) {
+    assert.ok(point.low >= 0);
+    assert.ok(point.mean >= point.low);
+    assert.ok(point.high >= point.mean);
+  }
+  const flat = forecastBand(
+    lastDayKeys(now, 30).map((key) => ({ key, label: key, count: 4 })),
+    now,
+    14
+  );
+  assert.ok(flat.points.every((point) => point.mean >= 3 && point.mean <= 5));
+});
+
+test("detectSpikes flags days well above the window run-rate", () => {
+  const buckets = lastDayKeys(now, 14).map((key, index) => ({
+    key,
+    label: key,
+    count: index === 13 ? 20 : 1,
+  }));
+  const spikes = detectSpikes(buckets);
+  assert.equal(spikes.length, 1);
+  assert.equal(spikes[0]?.key, "2026-09-21");
+  assert.ok((spikes[0]?.z ?? 0) >= 1.5);
+  assert.deepEqual(
+    detectSpikes(buckets.map((bucket) => ({ ...bucket, count: 3 }))),
+    []
+  );
 });
