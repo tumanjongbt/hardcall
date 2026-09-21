@@ -344,6 +344,16 @@ test("POST /api/events validation failures", async () => {
         rule: "enum",
       },
       {
+        payload: { channel: "university", title: "x", source: "bls" },
+        field: "source",
+        rule: "reserved",
+      },
+      {
+        payload: { channel: "university", title: "x", source: "onet" },
+        field: "source",
+        rule: "reserved",
+      },
+      {
         payload: { channel: "university", title: "x", source_url: "not-a-url" },
         field: "source_url",
         rule: "http_url",
@@ -565,6 +575,14 @@ const insightSeed: InsightRow[] = [
 
 test("GET /api/insights returns updated_at DESC", async () => {
   await withApp(memoryStore(undefined, [], insightSeed), async (app) => {
+    const spoof = await app.inject({
+      method: "POST",
+      url: "/api/insight",
+      headers: { "content-type": "application/json" },
+      payload: { title: "Spoofed live KPI", value: "+99%", source: "bls" },
+    });
+    assert.equal(spoof.statusCode, 400);
+
     const res = await app.inject({ method: "GET", url: "/api/insights" });
     assert.equal(res.statusCode, 200);
     assert.equal(res.headers["access-control-allow-origin"], "*");
@@ -575,6 +593,7 @@ test("GET /api/insights returns updated_at DESC", async () => {
     );
     assert.equal(body.insights[0]?.detail, "");
     assert.equal(body.insights[0]?.source, "synthetic");
+    assert.ok(body.insights.every((row) => row.source === "synthetic"));
     assert.match(body.insights[1]?.detail ?? "", /Four-year ROI/);
   });
 });
@@ -647,6 +666,8 @@ test("POST /api/insight validation failures", async () => {
       { payload: { title: "ROI", value: "  " }, field: "value", rule: "length_1_500" },
       { payload: { title: "ROI", value: "+18%", extra: 1 }, field: "extra", rule: "unknown_key" },
       { payload: { title: "ROI", value: "+18%", source: "cli" }, field: "source", rule: "enum" },
+      { payload: { title: "ROI", value: "+18%", source: "bls" }, field: "source", rule: "reserved" },
+      { payload: { title: "ROI", value: "+18%", source: "onet" }, field: "source", rule: "reserved" },
       { payload: { title: "ROI", value: "+18%", detail: 1 }, field: "detail", rule: "string" },
       {
         payload: { title: "ROI", value: "+18%", detail: "x".repeat(8001) },
@@ -740,6 +761,58 @@ test("POST /api/insight persist failure is opaque", async () => {
   });
 });
 
+test("POST /api/events rejects reserved live sources", async () => {
+  await withApp(memoryStore(), async (app) => {
+    for (const source of ["bls", "onet"] as const) {
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/events",
+        headers: { "content-type": "application/json" },
+        payload: {
+          channel: "trade",
+          title: "Spoofed live row",
+          source,
+          source_url: "https://www.bls.gov/ooh/",
+          fetched_at: "2026-09-21T12:00:00.000Z",
+        },
+      });
+      assert.equal(res.statusCode, 400, source);
+      const body = res.json() as {
+        error: string;
+        details: { field: string; rule: string }[];
+      };
+      assert.equal(body.error, "validation_failed");
+      assert.ok(
+        body.details.some((d) => d.field === "source" && d.rule === "reserved"),
+        JSON.stringify(body.details)
+      );
+    }
+  });
+});
+
+test("POST /api/insight rejects reserved live sources", async () => {
+  await withApp(memoryStore(), async (app) => {
+    for (const source of ["bls", "onet"] as const) {
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/insight",
+        headers: { "content-type": "application/json" },
+        payload: { title: "Spoofed live KPI", value: "+99%", source },
+      });
+      assert.equal(res.statusCode, 400, source);
+      const body = res.json() as {
+        error: string;
+        details: { field: string; rule: string }[];
+      };
+      assert.equal(body.error, "validation_failed");
+      assert.ok(
+        body.details.some((d) => d.field === "source" && d.rule === "reserved"),
+        JSON.stringify(body.details)
+      );
+    }
+  });
+});
+
 test("POST /api/events accepts playground provenance", async () => {
   let stored: CreateEvent | undefined;
   await withApp(
@@ -776,13 +849,48 @@ test("POST /api/events accepts playground provenance", async () => {
 
 test("GET /api/events includes provenance fields", async () => {
   await withApp(memoryStore(undefined, seedRows), async (app) => {
+    const spoof = await app.inject({
+      method: "POST",
+      url: "/api/events",
+      headers: { "content-type": "application/json" },
+      payload: { channel: "trade", title: "Spoofed", source: "bls" },
+    });
+    assert.equal(spoof.statusCode, 400);
+
     const res = await app.inject({ method: "GET", url: "/api/events?limit=1" });
     assert.equal(res.statusCode, 200);
     const body = res.json() as { events: EventRow[] };
     assert.equal(body.events[0]?.source, "synthetic");
     assert.equal(body.events[0]?.source_url, null);
     assert.equal(body.events[0]?.fetched_at, null);
+    assert.ok(body.events.every((row) => row.source === "synthetic"));
   });
+});
+
+test("POST /api/events accepts cli provenance", async () => {
+  let stored: CreateEvent | undefined;
+  await withApp(
+    memoryStore((value) => {
+      stored = value;
+      return {
+        id: "550e8400-e29b-41d4-a716-446655440000",
+        ...value,
+        created_at: "2026-09-20T23:56:00.000Z",
+      };
+    }),
+    async (app) => {
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/events",
+        headers: { "content-type": "application/json" },
+        payload: { channel: "trade", title: "CLI row", source: "cli" },
+      });
+      assert.equal(res.statusCode, 201);
+      const body = res.json() as EventRow;
+      assert.equal(body.source, "cli");
+      assert.equal(stored?.source, "cli");
+    }
+  );
 });
 
 test("POST /api/insight keeps source when omitted on update", async () => {

@@ -30,7 +30,7 @@ GET /api/insights
 }
 ```
 
-`detail` is always a string (empty when no analysis has been stored). `source` is one of: `synthetic` \| `manual` \| `bls` \| `onet` \| `unknown`. Existing KPI seeds were backfilled to `synthetic`. Order is **`updated_at DESC`**, then **`title ASC`** (most recently refreshed KPI first).
+`detail` is always a string (empty when no analysis has been stored). `source` is one of: `synthetic` \| `manual` \| `bls` \| `onet` \| `unknown`. Existing KPI seeds were backfilled to `synthetic`. `bls` / `onet` remain reserved until locked ingest auth — anonymous `POST /api/insight` cannot mint them. Order is **`updated_at DESC`**, then **`title ASC`** (most recently refreshed KPI first).
 
 **500** persist failure (no leak of internals)
 

@@ -20,7 +20,7 @@ Public upsert for a market-insight KPI. Neutral path (no `hardcall`). Exact `tit
 | `title` | yes | string; trim; length 1–200 after trim; exact match is the upsert key |
 | `value` | yes | string; trim; length 1–500 after trim |
 | `detail` | no | string; trim; length 0–8000 after trim; omitted on **update** leaves the stored body unchanged |
-| `source` | no | one of: `synthetic` \| `manual` \| `bls` \| `onet` \| `unknown` (no `playground` / `cli`). Omitted on **insert** stores `synthetic`. Omitted on **update** keeps the stored source. Seed scripts should send `synthetic`. `bls` / `onet` are reserved for live adapters (not wired this phase). |
+| `source` | no | **Anonymous public POST may send only:** `synthetic` \| `manual` \| `unknown` (no `playground` / `cli`). Omitted on **insert** stores `synthetic`. Omitted on **update** keeps the stored source. Seed scripts should send `synthetic`. `bls` / `onet` remain in the stored/GET enum for future locked ingest (Supernova auth) — **anonymous clients cannot set them** (400 `source` / `reserved`). |
 
 Reject unknown top-level keys (400). Server sets `id`, `created_at`, `updated_at` on insert. On update, `id` and `created_at` stay; `value` and `updated_at` change; `detail` and `source` change only when the key is sent.
 
@@ -46,7 +46,7 @@ A new title with no `detail` stores `""`. Sending `detail` as blank after trim w
 
 **400** validation — `{ "error": "validation_failed", "details": [ { "field": "title", "rule": "length_1_200" } ] }`
 
-`detail` over 8000 characters after trim uses `rule: "length_0_8000"`. Unknown `source` uses `rule: "enum"`.
+`detail` over 8000 characters after trim uses `rule: "length_0_8000"`. Unknown `source` uses `rule: "enum"`. Anonymous `source` of `bls` or `onet` uses `rule: "reserved"`.
 
 **415** non-JSON body (`Content-Type` not `application/json`, or invalid JSON)
 
@@ -58,7 +58,7 @@ A new title with no `detail` stores `""`. Sending `detail` as blank after trim w
 |-----------|--------|
 | valid body, inserted | 201 |
 | valid body, updated existing title | 200 |
-| missing/invalid title or value, lengths, unknown keys, non-object, invalid source | 400 |
+| missing/invalid title or value, lengths, unknown keys, non-object, invalid or reserved live source (`bls`/`onet`) | 400 |
 | wrong content-type / non-JSON | 415 |
 | DB/unavailable | 500 |
 

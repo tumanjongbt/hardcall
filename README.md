@@ -14,6 +14,7 @@ Phase 1 is the always-on ingest API and cloud Postgres store. Scrapers and data 
 | Insights migration | `migrations/002_insights.sql` |
 | Insight detail migration | `migrations/003_insights_detail.sql` |
 | Event/insight provenance | `migrations/004_event_provenance.sql` |
+| Live-source integrity | `migrations/005_live_source_integrity.sql` |
 | Orion request validation | `src/events_validate.js`, `src/insights_validate.js` |
 | HTTP contracts | `contracts/POST_api_events.md`, `contracts/GET_api_events.md`, `contracts/GET_api_events_stream.md`, `contracts/POST_api_insight.md`, `contracts/GET_api_insights.md` |
 | TypeScript API | `src/app.ts`, `src/server.ts`, `src/sse_hub.ts` |
@@ -34,11 +35,11 @@ Required: `channel`, `title`. Optional: `description`, `emoji`, `tags`, `source`
 
 **Event `source`:** `synthetic` · `manual` · `playground` · `cli` · `bls` · `onet` · `unknown`
 
-`bls` / `onet` are reserved for live adapters (not wired this phase). `source_url` must be `http(s)` if present. `fetched_at` is an optional ISO timestamp.
+`bls` / `onet` stay in the stored enum for future locked ingest (Supernova). **Anonymous public POST cannot set them** (`400` `source` / `reserved`). Allowed on public POST: `synthetic` · `manual` · `playground` · `cli` · `unknown`. `source_url` must be `http(s)` if present. `fetched_at` is an optional ISO timestamp. Live `bls`/`onet` event rows (future ingest) also need both `source_url` and `fetched_at` (Protostar CHECK).
 
 ## Insight shape
 
-Required: `title`, `value`. Optional: `detail` (analysis body, trim, max 8000), `source` (`synthetic` · `manual` · `bls` · `onet` · `unknown`). Exact `title` is the upsert key (unique). Server sets `id`, `created_at`, `updated_at`. A later POST with the same title updates `value` and `updated_at`. If `detail` or `source` is omitted on update, the stored field is kept (not wiped). New titles with no `detail` store `""`; new titles with no `source` store `synthetic`. Existing KPI seeds were backfilled to `synthetic`.
+Required: `title`, `value`. Optional: `detail` (analysis body, trim, max 8000), `source`. Anonymous public POST may send only `synthetic` · `manual` · `unknown`. `bls` / `onet` stay in the stored enum for future locked ingest — **anonymous clients cannot set them** (`400` `source` / `reserved`). Exact `title` is the upsert key (unique). Server sets `id`, `created_at`, `updated_at`. A later POST with the same title updates `value` and `updated_at`. If `detail` or `source` is omitted on update, the stored field is kept (not wiped). New titles with no `detail` store `""`; new titles with no `source` store `synthetic`. Existing KPI seeds were backfilled to `synthetic`.
 
 ## `DATABASE_URL` (Neon or Supabase)
 
@@ -76,12 +77,12 @@ npx tsc --noEmit   # optional extra typecheck
 npm run migrate    # applies pending files in migrations/ (001_events, 002_insights, …)
 ```
 
-`schema_migrations` records each file stem (`001_events`, `002_insights`, `003_insights_detail`, `004_event_provenance`) so the runner is idempotent. Re-running skips already-applied files. Railway can still run `npm run migrate` on deploy. **Render free-tier does not run a release/pre-deploy migrate** — after merge, Bernard must paste the new SQL in the Supabase SQL editor (same as `002_insights.sql`), then record the stem so a later runner skips it:
+`schema_migrations` records each file stem (`001_events`, `002_insights`, `003_insights_detail`, `004_event_provenance`, `005_live_source_integrity`) so the runner is idempotent. Re-running skips already-applied files. Railway can still run `npm run migrate` on deploy. **Render free-tier does not run a release/pre-deploy migrate** — after merge, Bernard must paste the new SQL in the Supabase SQL editor (same as `002_insights.sql`), then record the stem so a later runner skips it:
 
 ```sql
--- 1. Paste the full contents of migrations/004_event_provenance.sql
+-- 1. Paste the full contents of migrations/005_live_source_integrity.sql
 -- 2. Then:
-INSERT INTO schema_migrations (id) VALUES ('004_event_provenance')
+INSERT INTO schema_migrations (id) VALUES ('005_live_source_integrity')
 ON CONFLICT (id) DO NOTHING;
 ```
 
@@ -225,7 +226,7 @@ Render sets `NODE_ENV=production` during install, which omits `devDependencies`.
 2. Build: `npm ci && npm run build`
 3. Start: `npm start`
 4. Environment: `DATABASE_URL` = Neon or Supabase pooler URL.
-5. Release / pre-deploy command: `npm run migrate` (Render **free** often cannot run this — paste new SQL in the Supabase SQL editor instead, same as `002` / `003` / `004`)
+5. Release / pre-deploy command: `npm run migrate` (Render **free** often cannot run this — paste new SQL in the Supabase SQL editor instead, same as `002` / `003` / `004` / `005`)
 6. Health check path: `/health`
 
 If you prefer to keep compilers in `devDependencies`, override the install with:

@@ -1,4 +1,4 @@
--- Hardcall — reactive market insights (KPI cards). Neutral DDL (no hardcall identifiers).
+-- Reactive market insights (KPI cards). Neutral DDL (no product identifiers).
 -- Exact-title upsert key: UNIQUE(title). Empty / overlong title or value is illegal.
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
