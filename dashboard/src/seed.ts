@@ -1,29 +1,9 @@
-import { TAGS, isChannel, type Channel, type StakeholderTag } from "./channels";
+import type { Channel, StakeholderTag } from "./channels";
 
 export type SeedFile = {
   events: Record<string, unknown>[];
   insights: Record<string, unknown>[];
 };
-
-/** Bernard display-channel slugs → POST /api/events enums. */
-const SEED_DISPLAY_CHANNELS: Record<string, Channel> = {
-  "growing-jobs": "trade",
-  "ai-impact-alerts": "automation",
-  "pay-updates": "community_college",
-  "pathway-comparison": "apprenticeship",
-  "skills-needed": "community_college",
-};
-
-/** Case-insensitive display labels → stakeholder tag enums. */
-const SEED_DISPLAY_TAGS: Record<string, StakeholderTag> = {
-  "high school students": "high_school_students",
-  "college students": "college_students",
-  parents: "parents",
-  "career counselors": "career_counselors",
-  "workforce training managers": "workforce_training_managers",
-};
-
-const API_TAGS = new Set<string>(TAGS);
 
 export type SeedProgress = {
   running: boolean;
@@ -36,6 +16,27 @@ export type SeedProgress = {
   errors: string[];
   success: string | null;
   parseError: string | null;
+};
+
+const SEED_CHANNEL_MAP: Record<string, Channel> = {
+  "growing jobs": "trade",
+  "ai impact alerts": "automation",
+  "pay updates": "community_college",
+  "pathway comparison": "apprenticeship",
+  "skills needed": "community_college",
+  university: "university",
+  "community college": "community_college",
+  trade: "trade",
+  apprenticeship: "apprenticeship",
+  automation: "automation",
+};
+
+const SEED_TAG_MAP: Record<string, StakeholderTag> = {
+  "high school students": "high_school_students",
+  "college students": "college_students",
+  parents: "parents",
+  "career counselors": "career_counselors",
+  "workforce training managers": "workforce_training_managers",
 };
 
 export function emptySeedProgress(): SeedProgress {
@@ -92,35 +93,26 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-function presentString(value: unknown): string | undefined {
-  return typeof value === "string" && value.trim() ? value : undefined;
+function itemTitle(raw: Record<string, unknown>, fallback: string): string {
+  return typeof raw.title === "string" && raw.title.trim() ? raw.title.trim() : fallback;
 }
 
-/** Map seed display channel (or already-valid API enum) to POST body channel. */
-function mapSeedChannel(raw: unknown): unknown {
-  if (typeof raw !== "string") return raw;
-  const trimmed = raw.trim();
-  if (isChannel(trimmed)) return trimmed;
-  return SEED_DISPLAY_CHANNELS[trimmed] ?? trimmed;
+function normalizeKey(value: string): string {
+  return value.trim().toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ");
 }
 
-/** Map one seed tag; unknown labels (Apprenticeships, Community College, …) drop. */
-function mapSeedTag(raw: string): StakeholderTag | null {
-  const trimmed = raw.trim();
-  if (!trimmed) return null;
-  const lower = trimmed.toLowerCase();
-  if (API_TAGS.has(lower)) return lower as StakeholderTag;
-  return SEED_DISPLAY_TAGS[lower] ?? null;
+export function mapSeedChannel(raw: unknown): Channel | undefined {
+  if (typeof raw !== "string") return undefined;
+  return SEED_CHANNEL_MAP[normalizeKey(raw)];
 }
 
-/** Keep valid API tags / mapped display labels; drop the rest. Dedupes. */
-function mapSeedTags(raw: unknown): unknown {
-  if (!Array.isArray(raw)) return raw;
-  const seen = new Set<string>();
+export function mapSeedTags(raw: unknown): StakeholderTag[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<StakeholderTag>();
   const tags: StakeholderTag[] = [];
   for (const item of raw) {
     if (typeof item !== "string") continue;
-    const mapped = mapSeedTag(item);
+    const mapped = SEED_TAG_MAP[normalizeKey(item)];
     if (!mapped || seen.has(mapped)) continue;
     seen.add(mapped);
     tags.push(mapped);
@@ -128,34 +120,28 @@ function mapSeedTags(raw: unknown): unknown {
   return tags;
 }
 
-/** Prefer emoji; if missing, copy icon onto emoji. */
-function seedEmoji(raw: Record<string, unknown>): unknown | undefined {
-  if (presentString(raw.emoji) !== undefined) return raw.emoji;
-  if (presentString(raw.icon) !== undefined) return raw.icon;
-  if (raw.emoji !== undefined) return raw.emoji;
+function seedIcon(raw: Record<string, unknown>): string | undefined {
+  if (typeof raw.icon === "string" && raw.icon.trim()) return raw.icon.trim();
+  if (typeof raw.emoji === "string" && raw.emoji.trim()) return raw.emoji.trim();
   return undefined;
 }
 
-function itemTitle(raw: Record<string, unknown>, fallback: string): string {
-  return typeof raw.title === "string" && raw.title.trim() ? raw.title.trim() : fallback;
-}
-
-/** Convert seed event JSON to POST /api/events body. Strips minutes_ago. */
+/** Convert seed event JSON to POST /api/events body. Maps Bernard’s sample fields. */
 export function eventToPostPayload(
   raw: Record<string, unknown>,
   now = Date.now()
 ): Record<string, unknown> {
-  const payload: Record<string, unknown> = {};
-  if (raw.channel !== undefined) payload.channel = mapSeedChannel(raw.channel);
+  const payload: Record<string, unknown> = {
+    source: "synthetic",
+    tags: mapSeedTags(raw.tags),
+  };
+  const channel = mapSeedChannel(raw.channel);
+  if (channel) payload.channel = channel;
+  else if (raw.channel !== undefined) payload.channel = raw.channel;
   if (raw.title !== undefined) payload.title = raw.title;
   if (raw.description !== undefined) payload.description = raw.description;
-  const emoji = seedEmoji(raw);
-  if (emoji !== undefined) payload.emoji = emoji;
-  if (raw.tags !== undefined) payload.tags = mapSeedTags(raw.tags);
-  if (raw.source_url !== undefined) payload.source_url = raw.source_url;
-  if (raw.fetched_at !== undefined) payload.fetched_at = raw.fetched_at;
-  payload.source =
-    typeof raw.source === "string" && raw.source.trim() ? raw.source.trim() : "synthetic";
+  const icon = seedIcon(raw);
+  if (icon) payload.emoji = icon;
 
   if (typeof raw.minutes_ago === "number" && Number.isFinite(raw.minutes_ago)) {
     payload.created_at = new Date(now - raw.minutes_ago * 60 * 1000).toISOString();
@@ -167,19 +153,11 @@ export function eventToPostPayload(
 
 /** Convert seed insight JSON to POST /api/insight body. */
 export function insightToPostPayload(raw: Record<string, unknown>): Record<string, unknown> {
-  const payload: Record<string, unknown> = {};
+  const payload: Record<string, unknown> = { source: "synthetic" };
   if (raw.title !== undefined) payload.title = raw.title;
   if (raw.value !== undefined) payload.value = raw.value;
-  const detail = presentString(raw.detail);
-  if (detail !== undefined) {
-    payload.detail = raw.detail;
-  } else if (presentString(raw.icon) !== undefined) {
-    payload.detail = `Icon: ${raw.icon}`;
-  } else if (raw.detail !== undefined) {
-    payload.detail = raw.detail;
-  }
-  payload.source =
-    typeof raw.source === "string" && raw.source.trim() ? raw.source.trim() : "synthetic";
+  const icon = seedIcon(raw);
+  payload.detail = icon ? `Icon: ${icon}` : "";
   return payload;
 }
 

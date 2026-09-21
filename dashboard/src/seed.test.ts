@@ -5,6 +5,8 @@ import {
   ingestSeed,
   insightToPostPayload,
   isJsonFile,
+  mapSeedChannel,
+  mapSeedTags,
   parseSeedJson,
   successMessage,
 } from "./seed";
@@ -16,11 +18,12 @@ test("isJsonFile accepts .json names only", () => {
   assert.equal(isJsonFile({ name: "seed.json.txt" }), false);
 });
 
-test("parseSeedJson reads events and insights arrays", () => {
+test("parseSeedJson ignores project and reads events and insights", () => {
   const parsed = parseSeedJson(
     JSON.stringify({
-      events: [{ channel: "trade", title: "HVAC" }],
-      insights: [{ title: "ROI", value: "+6%" }],
+      project: { name: "Hardcall" },
+      events: [{ channel: "growing-jobs", title: "HVAC" }],
+      insights: [{ title: "ROI", value: "+6%", icon: "📈" }],
     })
   );
   assert.equal(parsed.ok, true);
@@ -38,141 +41,97 @@ test("parseSeedJson treats missing arrays as empty and rejects junk", () => {
   if (onlyEvents.ok) assert.deepEqual(onlyEvents.value.insights, []);
 });
 
-test("parseSeedJson ignores optional project key", () => {
-  const parsed = parseSeedJson(
-    JSON.stringify({
-      project: "hardcall",
-      events: [{ channel: "growing-jobs", title: "HVAC" }],
-    })
-  );
-  assert.equal(parsed.ok, true);
-  if (!parsed.ok) return;
-  assert.equal(parsed.value.events.length, 1);
-  assert.equal(parsed.value.insights.length, 0);
+test("mapSeedChannel uses the fixed seed-channel map", () => {
+  assert.equal(mapSeedChannel("growing-jobs"), "trade");
+  assert.equal(mapSeedChannel("ai-impact-alerts"), "automation");
+  assert.equal(mapSeedChannel("pay-updates"), "community_college");
+  assert.equal(mapSeedChannel("pathway-comparison"), "apprenticeship");
+  assert.equal(mapSeedChannel("skills-needed"), "community_college");
+  assert.equal(mapSeedChannel("Growing Jobs"), "trade");
+  assert.equal(mapSeedChannel("trade"), "trade");
+  assert.equal(mapSeedChannel("nope"), undefined);
 });
 
-test("eventToPostPayload converts minutes_ago and defaults source", () => {
+test("mapSeedTags maps display labels and skips path labels", () => {
+  assert.deepEqual(
+    mapSeedTags([
+      "High School Students",
+      "College Students",
+      "Parents",
+      "Career Counselors",
+      "Workforce Training Managers",
+      "Apprenticeships",
+      "Community College",
+      "high_school_students",
+    ]),
+    [
+      "high_school_students",
+      "college_students",
+      "parents",
+      "career_counselors",
+      "workforce_training_managers",
+    ]
+  );
+});
+
+test("eventToPostPayload maps Bernard seed fields to the API body", () => {
   const now = Date.parse("2026-09-21T12:00:00.000Z");
   const payload = eventToPostPayload(
     {
-      channel: "trade",
-      title: "Welding night cohort",
-      description: "Seats gone.",
-      emoji: "🔧",
-      tags: ["high_school_students"],
+      channel: "growing-jobs",
+      title: "Electrician overtime is spiking",
+      description: "Night call-outs in the valley.",
+      icon: "🔧",
+      tags: ["High School Students", "Apprenticeships"],
       minutes_ago: 120,
     },
     now
   );
-  assert.equal(payload.created_at, "2026-09-21T10:00:00.000Z");
+  assert.deepEqual(payload, {
+    channel: "trade",
+    title: "Electrician overtime is spiking",
+    description: "Night call-outs in the valley.",
+    emoji: "🔧",
+    tags: ["high_school_students"],
+    source: "synthetic",
+    created_at: "2026-09-21T10:00:00.000Z",
+  });
   assert.equal("minutes_ago" in payload, false);
-  assert.equal(payload.source, "synthetic");
-  assert.equal(payload.channel, "trade");
+  assert.equal("icon" in payload, false);
 });
 
-test("eventToPostPayload keeps fetched_at and explicit source", () => {
+test("eventToPostPayload always sends synthetic and never live sources", () => {
   const payload = eventToPostPayload({
-    channel: "trade",
-    title: "x",
-    source: "manual",
-    fetched_at: "2026-09-21T08:00:00.000Z",
+    channel: "ai-impact-alerts",
+    title: "Claims coding is automating",
+    source: "bls",
     minutes_ago: 0,
   });
-  assert.equal(payload.source, "manual");
-  assert.equal(payload.fetched_at, "2026-09-21T08:00:00.000Z");
-  assert.ok(typeof payload.created_at === "string");
-});
-
-test("eventToPostPayload maps Bernard display seed to API enums", () => {
-  const payload = eventToPostPayload({
-    channel: "growing-jobs",
-    title: "HVAC demand is climbing",
-    icon: "🔧",
-    tags: ["High School Students", "Apprenticeships", "Community College"],
-  });
-  assert.equal(payload.channel, "trade");
-  assert.deepEqual(payload.tags, ["high_school_students"]);
-  assert.equal(payload.emoji, "🔧");
-  assert.equal("icon" in payload, false);
   assert.equal(payload.source, "synthetic");
+  assert.equal(payload.channel, "automation");
 });
 
-test("eventToPostPayload maps every display channel and keeps API channels", () => {
-  assert.equal(eventToPostPayload({ channel: "growing-jobs", title: "x" }).channel, "trade");
-  assert.equal(eventToPostPayload({ channel: "ai-impact-alerts", title: "x" }).channel, "automation");
-  assert.equal(eventToPostPayload({ channel: "pay-updates", title: "x" }).channel, "community_college");
-  assert.equal(
-    eventToPostPayload({ channel: "pathway-comparison", title: "x" }).channel,
-    "apprenticeship"
+test("insightToPostPayload puts icon in detail and forces synthetic", () => {
+  assert.deepEqual(
+    insightToPostPayload({
+      title: "Top Trade Income Growth",
+      value: "+18%",
+      icon: "📈",
+      source: "onet",
+    }),
+    {
+      title: "Top Trade Income Growth",
+      value: "+18%",
+      detail: "Icon: 📈",
+      source: "synthetic",
+    }
   );
-  assert.equal(eventToPostPayload({ channel: "skills-needed", title: "x" }).channel, "community_college");
-  assert.equal(eventToPostPayload({ channel: "university", title: "x" }).channel, "university");
-  assert.equal(eventToPostPayload({ channel: "trade", title: "x" }).channel, "trade");
-  assert.equal(eventToPostPayload({ channel: "automation", title: "x" }).channel, "automation");
-  assert.equal(
-    eventToPostPayload({ channel: "community_college", title: "x" }).channel,
-    "community_college"
-  );
-  assert.equal(eventToPostPayload({ channel: "apprenticeship", title: "x" }).channel, "apprenticeship");
-});
-
-test("eventToPostPayload maps display tags case-insensitively and drops unknowns", () => {
-  const payload = eventToPostPayload({
-    channel: "trade",
-    title: "x",
-    tags: [
-      "HIGH SCHOOL STUDENTS",
-      "College Students",
-      "parents",
-      "Career Counselors",
-      "Workforce Training Managers",
-      "Apprenticeships",
-      "high_school_students",
-    ],
-  });
-  assert.deepEqual(payload.tags, [
-    "high_school_students",
-    "college_students",
-    "parents",
-    "career_counselors",
-    "workforce_training_managers",
-  ]);
-});
-
-test("eventToPostPayload prefers emoji over icon", () => {
-  const payload = eventToPostPayload({
-    channel: "trade",
-    title: "x",
-    emoji: "⚡",
-    icon: "🔧",
-  });
-  assert.equal(payload.emoji, "⚡");
-});
-
-test("insightToPostPayload defaults source to synthetic", () => {
-  assert.deepEqual(insightToPostPayload({ title: "ROI", value: "+6%", detail: "n" }), {
+  assert.deepEqual(insightToPostPayload({ title: "ROI", value: "+6%" }), {
     title: "ROI",
     value: "+6%",
-    detail: "n",
+    detail: "",
     source: "synthetic",
   });
-});
-
-test("insightToPostPayload copies icon into detail when detail is missing", () => {
-  const payload = insightToPostPayload({ title: "ROI", value: "+6%", icon: "📈" });
-  assert.equal(payload.detail, "Icon: 📈");
-  assert.equal(payload.source, "synthetic");
-  assert.equal("icon" in payload, false);
-});
-
-test("insightToPostPayload keeps explicit detail when icon is also present", () => {
-  const payload = insightToPostPayload({
-    title: "ROI",
-    value: "+6%",
-    detail: "Keep a waitlist.",
-    icon: "📈",
-  });
-  assert.equal(payload.detail, "Keep a waitlist.");
 });
 
 test("successMessage names career trends and insights", () => {
@@ -180,31 +139,44 @@ test("successMessage names career trends and insights", () => {
   assert.equal(successMessage(1, 2), "Successfully ingested 1 career trend · 2 insights");
 });
 
-test("ingestSeed posts events then insights and reports errors", async () => {
-  const posted: string[] = [];
+test("ingestSeed posts mapped events then insights", async () => {
+  const posted: unknown[] = [];
   const result = await ingestSeed(
     {
       events: [
-        { channel: "trade", title: "A", minutes_ago: 10 },
-        { channel: "trade", title: "B" },
+        {
+          channel: "growing-jobs",
+          title: "A",
+          icon: "🔧",
+          tags: ["High School Students"],
+          minutes_ago: 10,
+        },
+        { channel: "skills-needed", title: "B" },
       ],
-      insights: [{ title: "KPI", value: "1" }],
+      insights: [{ title: "KPI", value: "1", icon: "⭐" }],
     },
     {
       now: Date.parse("2026-09-21T12:00:00.000Z"),
       async postEvent(payload) {
+        posted.push(payload);
         const rec = payload as { title?: string };
-        posted.push(`event:${rec.title}`);
         if (rec.title === "B") throw new Error("HTTP 400: title: nope");
       },
       async postInsight(payload) {
-        const rec = payload as { title?: string };
-        posted.push(`insight:${rec.title}`);
+        posted.push(payload);
       },
       onProgress() {},
     }
   );
-  assert.deepEqual(posted, ["event:A", "event:B", "insight:KPI"]);
+  assert.equal((posted[0] as { channel: string }).channel, "trade");
+  assert.equal((posted[0] as { source: string }).source, "synthetic");
+  assert.equal((posted[1] as { channel: string }).channel, "community_college");
+  assert.deepEqual(posted[2], {
+    title: "KPI",
+    value: "1",
+    detail: "Icon: ⭐",
+    source: "synthetic",
+  });
   assert.equal(result.eventsOk, 1);
   assert.equal(result.insightsOk, 1);
   assert.equal(result.errors.length, 1);
