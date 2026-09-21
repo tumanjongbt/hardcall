@@ -22,7 +22,7 @@ test("parseViewState reads bookmark query keys", () => {
       q: "welding",
       insight: null,
       lens: null,
-      range: 30,
+      range: 90,
       forecast: 14,
       compare: ["trade", "university"],
     }
@@ -44,7 +44,7 @@ test("parseViewState restores defaults and ignores unknown channels", () => {
     q: "",
     insight: null,
     lens: null,
-    range: 30,
+    range: 90,
     forecast: 14,
     compare: ["trade", "university"],
   });
@@ -65,7 +65,7 @@ test("parseViewState reads lens, stakeholder alias, range, and compare", () => {
   assert.equal(parseViewState("?stakeholder=workforce_training_managers").lens, "workforce");
   assert.equal(parseViewState("?range=14").range, 14);
   assert.equal(parseViewState("?range=90").range, 90);
-  assert.equal(parseViewState("?range=99").range, 30);
+  assert.equal(parseViewState("?range=99").range, 90);
   assert.equal(parseViewState("?forecast=30").forecast, 30);
   assert.equal(parseViewState("?forecast=14").forecast, 14);
   assert.equal(parseViewState("?forecast=7").forecast, 14);
@@ -79,7 +79,7 @@ test("parseLens and parseRange and parseCompare helpers", () => {
   assert.equal(parseLens("counselors"), "counselors");
   assert.equal(parseRange("7"), 7);
   assert.equal(parseRange("90"), 90);
-  assert.equal(parseRange("nope"), 30);
+  assert.equal(parseRange("nope"), 90);
   assert.equal(parseForecast("30"), 30);
   assert.equal(parseForecast("nope"), 14);
   assert.deepEqual(parseCompare(null), ["trade", "university"]);
@@ -100,7 +100,7 @@ test("serializeViewState writes page, perPage, channel, and q", () => {
     forecast: 14,
     compare: ["trade", "university"],
   });
-  assert.equal(qs, "page=2&perPage=50&channel=trade&q=welding");
+  assert.equal(qs, "page=2&perPage=50&channel=trade&q=welding&range=30");
   assert.equal(
     hrefForState({
       tab: "events",
@@ -110,7 +110,7 @@ test("serializeViewState writes page, perPage, channel, and q", () => {
       q: "",
       insight: null,
       lens: null,
-      range: 30,
+      range: 90,
       forecast: 14,
       compare: ["trade", "university"],
     }),
@@ -125,7 +125,7 @@ test("serializeViewState writes page, perPage, channel, and q", () => {
       q: "",
       insight: null,
       lens: null,
-      range: 30,
+      range: 90,
       forecast: 14,
       compare: ["trade", "university"],
     }),
@@ -140,7 +140,7 @@ test("serializeViewState writes page, perPage, channel, and q", () => {
       q: "welding",
       insight: null,
       lens: null,
-      range: 30,
+      range: 90,
       forecast: 14,
       compare: ["trade", "university"],
     }),
@@ -155,7 +155,7 @@ test("serializeViewState writes page, perPage, channel, and q", () => {
       q: "",
       insight: "abc-1",
       lens: null,
-      range: 30,
+      range: 90,
       forecast: 14,
       compare: ["trade", "university"],
     }),
@@ -203,7 +203,7 @@ test("serializeViewState writes lens, range, and compare when not default", () =
       forecast: 30,
       compare: ["trade", "university"],
     }),
-    "/?tab=charts&page=1&perPage=50&range=90&forecast=30"
+    "/?tab=charts&page=1&perPage=50&forecast=30"
   );
   assert.equal(
     hrefForState({
@@ -214,7 +214,7 @@ test("serializeViewState writes lens, range, and compare when not default", () =
       q: "",
       insight: null,
       lens: null,
-      range: 30,
+      range: 90,
       forecast: 14,
       compare: [],
     }),

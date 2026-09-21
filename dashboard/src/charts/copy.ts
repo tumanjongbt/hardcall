@@ -1,5 +1,7 @@
 import { CHANNEL_LABELS, channelLabel, type Channel } from "../channels";
 
+export const EVENTS_SOURCE = "GET /api/events";
+
 export const DECISION_LINE =
   "Which education path is drawing more labor-market signal right now — and is automation pressure rising?";
 
@@ -7,44 +9,75 @@ export const EMPTY_COMPARE = "No data for selected paths";
 
 /** Short primary-viz captions. Secondary walls live behind More views. */
 export const CAPTIONS = {
-  activity: "Heating or cooling in this window, plus a forward band.",
+  activity: "Naive 14–30d band off hist. Not a wage or ROI guarantee.",
   compare: "Which of the two selected paths is drawing more signal right now.",
   table: "Volume, share, and a one-line so-what for the meeting.",
+  split: "Automation vs human-path share. Overlay, not a recommendation.",
 } as const;
 
 export const INFORMS = {
   doughnut:
     "Where alerts are clustering across the five paths — a first cut for which orbits are talking.",
   bars: "Each path’s daily pulse. Quiet next to busy is a briefing cue, not a verdict.",
-  stacked:
-    "Composition over time. Watch whether trade or community college is taking share.",
+  stacked: "Composition over time. Watch whether trade or community college is taking share.",
   stakeholders:
     "Who the alerts are aimed at — parents vs students vs counselors vs workforce.",
   heat: "Which UTC weekdays each path tends to fire. Time outreach for when a path is talking.",
   split:
-    "Automation-risk vs human-skill share. A rising automation slice is a resilience check, not a skip-university call.",
+    "Automation-risk vs human-skill share. A resilience overlay, not a path recommendation.",
 } as const;
 
-/** Mandatory. Forecasts and ranks are telemetry, not a recommendation. */
-export const NON_ADVISORY =
-  "Not advice. This forecast band is a telemetry projection from recent volume — not a recommendation to pick university, trade, or any other path.";
+/** Persistent chip on the forecast chart. Not footer-only. */
+export const FORECAST_CHIP = "Non-advisory · not a wage or ROI guarantee";
 
-/** Visible forecast note after the Not-advice chip. Must not start with “Not advice”. */
+/** Title/tooltip. Forecasts are telemetry, not a recommendation. */
+export const NON_ADVISORY =
+  "Not advice. Naive band off GET /api/events history — not a wage or ROI guarantee, and not a recommendation to pick a path.";
+
+/** Visible forecast note after the chip. Must not start with “Not advice”. */
 export const FORECAST_NOTE =
-  "This forecast band is a telemetry projection from recent volume — not a recommendation to pick university, trade, or any other path.";
+  "Naive last-rate ± hist SD from GET /api/events — not a wage or ROI guarantee.";
+
+export const PROJECTED_INTENSITY_LABEL =
+  "Projected signal intensity (not a wage or ROI guarantee)";
+
+export const SPARSE_HISTORY =
+  "Sparse history: most events sit on a few calendar days. The naive forecast band is still drawn, with a wide uncertainty range.";
 
 export const CHANNEL_SO_WHAT: Record<Channel, string> = {
-  university:
-    "Degree-path signal. Stress-test net tuition against shorter credentials before locking a four-year plan.",
-  community_college:
-    "Shorter credential signal. Often the cheaper on-ramp; check waitlists and stackable certs.",
-  trade:
-    "Hands-on demand. Often lower automation exposure — pair with licensure timelines.",
+  university: "Degree-path alert volume in this window. Signal intensity, not tuition value.",
+  community_college: "Shorter-credential alert volume in this window.",
+  trade: "Hands-on path alert volume in this window.",
   apprenticeship:
-    "Earn-while-you-learn volume. Strong for cost-sensitive families who need paid related instruction.",
+    "Paid related-instruction alert volume in this window. Not a wage or ROI guarantee.",
   automation:
-    "Displacement / tech-risk alerts. Use as a resilience overlay on the human paths, not a career by itself.",
+    "Displacement / tech-risk alert volume. Overlay on human-path volume, not a career recommendation.",
 };
+
+export function historySeriesLabel(
+  days: number,
+  asOf: string,
+  source = EVENTS_SOURCE
+): string {
+  return `History · last ${days}d · as of ${asOf} · ${source}`;
+}
+
+export function forecastSeriesLabel(
+  horizon: number,
+  asOf: string,
+  source = EVENTS_SOURCE
+): string {
+  return `Naive forecast · next ${horizon}d · as of ${asOf} · ${source}`;
+}
+
+export function vintageStrip(
+  days: number,
+  horizon: number,
+  asOf: string,
+  source = EVENTS_SOURCE
+): string {
+  return `Hist last ${days}d · forecast next ${horizon}d · as of ${asOf} · ${source}`;
+}
 
 export function rowSoWhat(row: { channel: Channel; wowLabel: string }): string {
   const base = CHANNEL_SO_WHAT[row.channel];
@@ -86,12 +119,12 @@ export function splitCaption(split: {
   }
   const auto = Math.round(split.automationPercent);
   if (split.automationPercent >= 40) {
-    return `Automation is ${auto}% of this window. Check whether human-path volume is also rising.`;
+    return `Automation is ${auto}% of this window’s volume. Human-path volume is shown separately — this is a split, not a recommendation.`;
   }
   if (split.automationPercent <= 15) {
-    return `Most signal (${Math.round(split.humanPercent)}%) is still on human pathways. Automation is a watch item.`;
+    return `Most volume (${Math.round(split.humanPercent)}%) is on human pathways. Automation is a small share in this window.`;
   }
-  return `A mixed board (${auto}% automation). Keep displacement risk in the conversation.`;
+  return `A mixed board (${auto}% automation). Displacement-risk share versus human-path share in this window.`;
 }
 
 export function lensHint(lensLabel: string): string {

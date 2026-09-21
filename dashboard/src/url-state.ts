@@ -11,7 +11,7 @@ import type {
 export const DEFAULT_PAGE = 1;
 export const DEFAULT_PER_PAGE: PerPage = 50;
 export const DEFAULT_TAB: DashboardTab = "events";
-export const DEFAULT_RANGE: ChartRange = 30;
+export const DEFAULT_RANGE: ChartRange = 90;
 export const DEFAULT_FORECAST: ForecastHorizon = 14;
 export const DEFAULT_COMPARE = ["trade", "university"] as const;
 

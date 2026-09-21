@@ -8,10 +8,12 @@ import {
   type Channel,
 } from "../channels";
 import type { EventRow } from "../types";
-import { CHANNEL_SO_WHAT, rowSoWhat } from "./copy";
+import { CHANNEL_SO_WHAT, EVENTS_SOURCE, rowSoWhat } from "./copy";
 
 export const WINDOW_DAYS = 30;
-export const DEFAULT_RANGE_DAYS = WINDOW_DAYS;
+export const DEFAULT_RANGE_DAYS = 90;
+export { EVENTS_SOURCE };
+export const MIN_TREND_OCCUPIED_DAYS = 7;
 export const RANGE_PRESETS = [7, 14, 30, 90] as const;
 export const FORECAST_HORIZONS = [14, 30] as const;
 export const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
@@ -84,9 +86,31 @@ export type ForecastPoint = {
   high: number;
 };
 
+export type ForecastUncertainty = "normal" | "high";
+
 export type ForecastBand = {
   horizon: number;
+  reliable: boolean;
+  method: "naive-hist-band";
+  uncertainty: ForecastUncertainty;
+  level: number;
+  pad: number;
   points: ForecastPoint[];
+};
+
+export type HistoryQuality = {
+  occupiedDays: number;
+  spanDays: number;
+  coverage: number;
+  sparse: boolean;
+  singleDay: boolean;
+  firstKey: string | null;
+  lastKey: string | null;
+};
+
+export type SeriesVintage = {
+  asOf: string;
+  source: typeof EVENTS_SOURCE;
 };
 
 export type CompareSeries = {
@@ -122,6 +146,8 @@ export type ChartData = {
   ranks: ChannelRankRow[];
   spikes: SpikeDay[];
   forecast: ForecastBand;
+  history: HistoryQuality;
+  vintage: SeriesVintage;
 };
 
 export function utcDayKey(isoOrDate: string | Date): string | null {
@@ -407,45 +433,76 @@ export function detectSpikes(buckets: DayBucket[], zThreshold = SPIKE_Z): SpikeD
     }));
 }
 
-function weekdayOfKey(key: string): number {
-  return new Date(`${key}T00:00:00.000Z`).getUTCDay();
+function round1(value: number): number {
+  return Math.round(value * 10) / 10;
+}
+
+export function historyQuality(buckets: DayBucket[]): HistoryQuality {
+  const occupied = buckets.filter((bucket) => bucket.count > 0);
+  const firstKey = occupied[0]?.key ?? null;
+  const lastKey = occupied[occupied.length - 1]?.key ?? null;
+  let spanDays = 0;
+  if (firstKey && lastKey) {
+    const first = Date.parse(`${firstKey}T00:00:00.000Z`);
+    const last = Date.parse(`${lastKey}T00:00:00.000Z`);
+    spanDays = Math.max(1, Math.round((last - first) / 86_400_000) + 1);
+  }
+  const occupiedDays = occupied.length;
+  const coverage = buckets.length === 0 ? 0 : occupiedDays / buckets.length;
+  const singleDay = occupiedDays <= 1;
+  const sparse =
+    occupiedDays < MIN_TREND_OCCUPIED_DAYS || spanDays < MIN_TREND_OCCUPIED_DAYS || singleDay;
+  return {
+    occupiedDays,
+    spanDays,
+    coverage,
+    sparse,
+    singleDay,
+    firstKey,
+    lastKey,
+  };
+}
+
+export function seriesVintage(events: EventRow[], now: Date): SeriesVintage {
+  let latest: string | null = null;
+  for (const event of events) {
+    const key = utcDayKey(event.created_at);
+    if (!key) continue;
+    if (!latest || key > latest) latest = key;
+  }
+  return {
+    asOf: latest ?? utcDayKey(now) ?? now.toISOString().slice(0, 10),
+    source: EVENTS_SOURCE,
+  };
 }
 
 /**
- * Client-side 14/30-day envelope from the selected history window.
- * Weekday run-rate × recent scale, plus a mild half-window slope. Not advice.
+ * Naive 14/30-day band off the historical daily series: last occupied day's
+ * count carried forward, ± hist SD. Sparse / same-day seed still emits a
+ * wider band so uncertainty stays visible. Not a wage or ROI guarantee.
  */
 export function forecastBand(
   buckets: DayBucket[],
   now: Date,
   horizon: number
 ): ForecastBand {
+  const quality = historyQuality(buckets);
+  const uncertainty: ForecastUncertainty = quality.sparse ? "high" : "normal";
   const keys = futureDayKeys(now, Math.max(0, horizon));
   const counts = buckets.map((bucket) => bucket.count);
-  const histMean = mean(counts);
-  const recentMean = mean(counts.slice(-7).length ? counts.slice(-7) : counts);
-  const scale = histMean === 0 ? 1 : recentMean / histMean;
-  const midpoint = Math.floor(buckets.length / 2);
-  const firstMean = mean(counts.slice(0, Math.max(1, midpoint)));
-  const secondMean = mean(counts.slice(Math.max(1, midpoint)));
-  const slope =
-    buckets.length >= 4 ? (secondMean - firstMean) / Math.max(1, midpoint) : 0;
+  const occupied = counts.filter((count) => count > 0);
+  const level = occupied[occupied.length - 1] ?? 0;
+  const sd = sampleStddev(counts);
+  const occupiedMean = mean(occupied);
+  const pad =
+    uncertainty === "high"
+      ? Math.max(sd, level, occupiedMean, 1) * 1.5
+      : Math.max(sd, 0.5);
 
-  const byWeekday: number[][] = [[], [], [], [], [], [], []];
-  for (const bucket of buckets) {
-    byWeekday[weekdayOfKey(bucket.key)]?.push(bucket.count);
-  }
-
-  const points: ForecastPoint[] = keys.map((key, index) => {
-    const weekday = weekdayOfKey(key);
-    const samples = byWeekday[weekday] ?? [];
-    const weekdayMean = samples.length > 0 ? mean(samples) : histMean;
-    const weekdaySd = sampleStddev(samples.length >= 2 ? samples : counts);
-    const projected = Math.max(0, weekdayMean * scale + slope * (index + 1));
-    const pad = weekdaySd * scale * 1.28;
-    const meanValue = Math.round(projected * 10) / 10;
-    const low = Math.max(0, Math.round((projected - pad) * 10) / 10);
-    const high = Math.max(meanValue, Math.round((projected + pad) * 10) / 10);
+  const points: ForecastPoint[] = keys.map((key) => {
+    const meanValue = round1(Math.max(0, level));
+    const low = Math.max(0, round1(level - pad));
+    const high = Math.max(meanValue, round1(level + pad));
     return {
       key,
       label: formatDayLabel(key),
@@ -455,7 +512,15 @@ export function forecastBand(
     };
   });
 
-  return { horizon, points };
+  return {
+    horizon,
+    reliable: true,
+    method: "naive-hist-band",
+    uncertainty,
+    level: round1(level),
+    pad: round1(pad),
+    points,
+  };
 }
 
 function lastVsPrevious(buckets: DayBucket[]): string {
@@ -507,7 +572,7 @@ export function chartDataFromEvents(
     horizon?: number;
   } = {}
 ): ChartData {
-  const days = options.days ?? WINDOW_DAYS;
+  const days = options.days ?? DEFAULT_RANGE_DAYS;
   const channel = options.channel ?? null;
   const horizon = options.horizon ?? 14;
   const inRange = eventsInRange(events, now, days);
@@ -528,5 +593,7 @@ export function chartDataFromEvents(
     ranks: channelRanks(events, now, days),
     spikes: detectSpikes(activity),
     forecast: forecastBand(activity, now, horizon),
+    history: historyQuality(activity),
+    vintage: seriesVintage(events, now),
   };
 }

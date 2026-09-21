@@ -76,13 +76,14 @@
           Charts read the same loaded events as the feed (<code>GET /api/events</code>
           plus live SSE), then apply the audience lens. Open <code>?tab=charts</code>.
           Channel chips and 300ms-debounced search still recompute every viz.
-          Lookback is <code>range=7|14|30|90</code> (default 30; 90 is history).
-          Forecast band chips live on the activity card (<code>forecast=14|30</code>).
+          Lookback is <code>range=7|14|30|90</code> (default 90).
+          Naive forecast band chips live on the activity card (<code>forecast=14|30</code>).
           Lens is <code>lens=</code> or <code>stakeholder=</code>.
           Path compare is <code>compare=trade,university</code>.
-          Secondary mix, resilience, heat, and per-path bars stay behind
-          <strong>More views</strong>. The <strong>Not advice</strong> chip sits on
-          the forecast — the band is telemetry, not a recommendation.
+          <strong>Automation resilience</strong> sits on the primary fold with activity.
+          Secondary mix, heat, and per-path bars stay behind <strong>More views</strong>.
+          The <strong>Non-advisory · not a wage or ROI guarantee</strong> chip sits
+          on the forecast — ranges and <code>GET /api/events</code> vintage stay on the series.
         </p>
       </div>
 
