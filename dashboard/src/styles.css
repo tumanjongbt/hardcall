@@ -128,7 +128,7 @@ body {
 
 .hero {
   position: relative;
-  height: 88px;
+  height: clamp(140px, 22vw, 220px);
   margin: 0 0 18px;
   overflow: hidden;
   border-radius: 16px;
@@ -144,8 +144,10 @@ body {
   display: block;
   width: 100%;
   height: 100%;
-  object-fit: cover;
-  object-position: center 46%;
+  max-width: 100%;
+  /* contain: the 16:9 map keeps HARDCALL, star, and all four path labels */
+  object-fit: contain;
+  object-position: center 36%;
 }
 
 .tabs {
@@ -1308,10 +1310,6 @@ select.field {
 
   .heat-table {
     min-width: 28rem;
-  }
-
-  .hero {
-    height: 64px;
   }
 
   .masthead__logo {
