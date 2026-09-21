@@ -1,10 +1,12 @@
 import Fastify, { type FastifyInstance } from "fastify";
-import { validateCreateEvent } from "./events_validate";
+import { CHANNELS, validateCreateEvent } from "./events_validate";
 import { createSseHub, type SseHub } from "./sse_hub";
-import type { EventStore } from "./types";
+import type { EventStore, ListEventsQuery } from "./types";
 
 const SSE_HEARTBEAT_MS = 15_000;
 const SSE_RETRY_MS = 5_000;
+export const DEFAULT_LIST_LIMIT = 1000;
+export const MAX_LIST_LIMIT = 1000;
 
 function isJsonContentType(value: string | undefined): boolean {
   if (!value) return false;
@@ -22,6 +24,50 @@ function isParserError(err: unknown): boolean {
     code === "FST_ERR_CTP_INVALID_JSON_BODY" ||
     code === "FST_ERR_CTP_INVALID_MEDIA_TYPE"
   );
+}
+
+function firstQueryValue(value: unknown): string | undefined {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value) && typeof value[0] === "string") return value[0];
+  return undefined;
+}
+
+export function parseListQuery(
+  query: unknown
+):
+  | { ok: true; value: ListEventsQuery }
+  | { ok: false; details: { field: string; rule: string }[] } {
+  const rec =
+    query !== null && typeof query === "object" && !Array.isArray(query)
+      ? (query as Record<string, unknown>)
+      : {};
+  const details: { field: string; rule: string }[] = [];
+
+  const rawChannel = firstQueryValue(rec.channel);
+  let channel: string | undefined;
+  if (rawChannel !== undefined && rawChannel.length > 0) {
+    if (!CHANNELS.has(rawChannel)) {
+      details.push({ field: "channel", rule: "enum" });
+    } else {
+      channel = rawChannel;
+    }
+  }
+
+  let limit = DEFAULT_LIST_LIMIT;
+  const rawLimit = firstQueryValue(rec.limit);
+  if (rawLimit !== undefined && rawLimit.length > 0) {
+    const n = Number(rawLimit);
+    if (!Number.isInteger(n) || n < 1) {
+      details.push({ field: "limit", rule: "integer_range" });
+    } else {
+      limit = Math.min(n, MAX_LIST_LIMIT);
+    }
+  }
+
+  if (details.length) return { ok: false, details };
+  return channel
+    ? { ok: true, value: { limit, channel } }
+    : { ok: true, value: { limit } };
 }
 
 export function createApp(
@@ -44,7 +90,33 @@ export function createApp(
     return reply.code(500).send({ error: "persist_failed" });
   });
 
+  app.addHook("onRequest", async (_request, reply) => {
+    reply.header("Access-Control-Allow-Origin", "*");
+    reply.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+    reply.header("Access-Control-Allow-Headers", "Content-Type");
+  });
+
+  app.options("*", async (_request, reply) => reply.code(204).send());
+
   app.get("/health", async () => ({ ok: true }));
+
+  app.get("/api/events", async (request, reply) => {
+    const parsed = parseListQuery(request.query);
+    if (!parsed.ok) {
+      return reply.code(400).send({
+        error: "validation_failed",
+        details: parsed.details,
+      });
+    }
+
+    try {
+      const events = await store.listEvents(parsed.value);
+      return reply.send({ events });
+    } catch (err) {
+      request.log.error(err);
+      return reply.code(500).send({ error: "persist_failed" });
+    }
+  });
 
   app.get("/api/events/stream", (request, reply) => {
     reply.hijack();

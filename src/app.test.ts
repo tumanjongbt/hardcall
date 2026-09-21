@@ -5,15 +5,30 @@ import { createApp } from "./app";
 import { createSseHub, formatSseMessage } from "./sse_hub";
 import type { CreateEvent, EventRow, EventStore } from "./types";
 
-function memoryStore(onInsert?: (value: CreateEvent) => EventRow | Promise<EventRow>): EventStore {
+function memoryStore(
+  onInsert?: (value: CreateEvent) => EventRow | Promise<EventRow>,
+  seed: EventRow[] = []
+): EventStore {
+  const rows = [...seed];
   return {
     async insertEvent(value) {
       if (onInsert) return onInsert(value);
-      return {
+      const row: EventRow = {
         id: "550e8400-e29b-41d4-a716-446655440000",
         ...value,
         created_at: "2026-09-20T23:56:00.000Z",
       };
+      rows.unshift(row);
+      return row;
+    },
+    async listEvents({ limit, channel }) {
+      return rows
+        .filter((row) => !channel || row.channel === channel)
+        .sort((a, b) => {
+          const byTime = b.created_at.localeCompare(a.created_at);
+          return byTime !== 0 ? byTime : b.id.localeCompare(a.id);
+        })
+        .slice(0, limit);
     },
   };
 }
@@ -36,6 +51,133 @@ test("GET /health", async () => {
     const res = await app.inject({ method: "GET", url: "/health" });
     assert.equal(res.statusCode, 200);
     assert.deepEqual(res.json(), { ok: true });
+    assert.equal(res.headers["access-control-allow-origin"], "*");
+  });
+});
+
+test("OPTIONS is CORS-open", async () => {
+  await withApp(memoryStore(), async (app) => {
+    const res = await app.inject({
+      method: "OPTIONS",
+      url: "/api/events",
+      headers: {
+        origin: "http://127.0.0.1:5173",
+        "access-control-request-method": "GET",
+      },
+    });
+    assert.equal(res.statusCode, 204);
+    assert.equal(res.headers["access-control-allow-origin"], "*");
+  });
+});
+
+const seedRows: EventRow[] = [
+  {
+    id: "00000000-0000-4000-8000-000000000001",
+    channel: "trade",
+    title: "Welding night program",
+    description: "Open seats",
+    emoji: "🔧",
+    tags: ["high_school_students"],
+    created_at: "2026-09-20T10:00:00.000Z",
+  },
+  {
+    id: "00000000-0000-4000-8000-000000000002",
+    channel: "university",
+    title: "CS salaries up",
+    description: "Metro X",
+    emoji: "📈",
+    tags: ["college_students", "parents"],
+    created_at: "2026-09-21T10:00:00.000Z",
+  },
+  {
+    id: "00000000-0000-4000-8000-000000000003",
+    channel: "trade",
+    title: "HVAC demand",
+    description: null,
+    emoji: null,
+    tags: ["parents"],
+    created_at: "2026-09-21T10:00:00.000Z",
+  },
+];
+
+test("GET /api/events returns newest-first with CORS", async () => {
+  await withApp(memoryStore(undefined, seedRows), async (app) => {
+    const res = await app.inject({ method: "GET", url: "/api/events" });
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.headers["access-control-allow-origin"], "*");
+    const body = res.json() as { events: EventRow[] };
+    assert.deepEqual(
+      body.events.map((e) => e.id),
+      [
+        "00000000-0000-4000-8000-000000000003",
+        "00000000-0000-4000-8000-000000000002",
+        "00000000-0000-4000-8000-000000000001",
+      ]
+    );
+  });
+});
+
+test("GET /api/events filters by channel and honors limit cap", async () => {
+  await withApp(memoryStore(undefined, seedRows), async (app) => {
+    const filtered = await app.inject({
+      method: "GET",
+      url: "/api/events?channel=trade&limit=1",
+    });
+    assert.equal(filtered.statusCode, 200);
+    const body = filtered.json() as { events: EventRow[] };
+    assert.equal(body.events.length, 1);
+    assert.equal(body.events[0]?.id, "00000000-0000-4000-8000-000000000003");
+    assert.equal(body.events[0]?.channel, "trade");
+
+    const capped = await app.inject({
+      method: "GET",
+      url: "/api/events?limit=1001",
+    });
+    assert.equal(capped.statusCode, 200);
+    assert.equal((capped.json() as { events: EventRow[] }).events.length, 3);
+  });
+});
+
+test("GET /api/events validation failures", async () => {
+  await withApp(memoryStore(), async (app) => {
+    const badChannel = await app.inject({
+      method: "GET",
+      url: "/api/events?channel=nope",
+    });
+    assert.equal(badChannel.statusCode, 400);
+    assert.deepEqual(badChannel.json(), {
+      error: "validation_failed",
+      details: [{ field: "channel", rule: "enum" }],
+    });
+
+    const badLimit = await app.inject({
+      method: "GET",
+      url: "/api/events?limit=0",
+    });
+    assert.equal(badLimit.statusCode, 400);
+    const body = badLimit.json() as {
+      error: string;
+      details: { field: string; rule: string }[];
+    };
+    assert.equal(body.error, "validation_failed");
+    assert.ok(body.details.some((d) => d.field === "limit" && d.rule === "integer_range"));
+  });
+});
+
+test("GET /api/events persist failure is opaque", async () => {
+  const store: EventStore = {
+    async insertEvent() {
+      throw new Error("unused");
+    },
+    async listEvents() {
+      throw new Error("ECONNREFUSED secret-host");
+    },
+  };
+  await withApp(store, async (app) => {
+    const res = await app.inject({ method: "GET", url: "/api/events" });
+    assert.equal(res.statusCode, 500);
+    assert.deepEqual(res.json(), { error: "persist_failed" });
+    assert.equal(res.body.includes("secret-host"), false);
   });
 });
 
