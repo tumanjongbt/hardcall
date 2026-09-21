@@ -1,16 +1,22 @@
 import { isChannel } from "./channels";
-import type { PerPage, ViewState } from "./types";
+import type { DashboardTab, PerPage, ViewState } from "./types";
 
 export const DEFAULT_PAGE = 1;
 export const DEFAULT_PER_PAGE: PerPage = 50;
+export const DEFAULT_TAB: DashboardTab = "events";
 
 export function defaultViewState(): ViewState {
   return {
+    tab: DEFAULT_TAB,
     page: DEFAULT_PAGE,
     perPage: DEFAULT_PER_PAGE,
     channel: null,
     q: "",
   };
+}
+
+export function parseTab(value: string | null): DashboardTab {
+  return value === "insights" ? "insights" : "events";
 }
 
 export function parsePerPage(value: string | null): PerPage {
@@ -29,6 +35,7 @@ export function parseViewState(search: string): ViewState {
   const channel =
     channelRaw && isChannel(channelRaw) ? channelRaw : null;
   return {
+    tab: parseTab(params.get("tab")),
     page,
     perPage: parsePerPage(params.get("perPage")),
     channel,
@@ -38,6 +45,7 @@ export function parseViewState(search: string): ViewState {
 
 export function serializeViewState(state: ViewState): string {
   const params = new URLSearchParams();
+  if (state.tab !== DEFAULT_TAB) params.set("tab", state.tab);
   params.set("page", String(state.page));
   params.set("perPage", String(state.perPage));
   if (state.channel) params.set("channel", state.channel);

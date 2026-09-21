@@ -1,5 +1,5 @@
 import { createApp } from "./app";
-import type { CreateEvent, EventRow, EventStore } from "./types";
+import type { CreateEvent, CreateInsight, EventRow, InsightRow, Store } from "./types";
 
 const FIXTURES: CreateEvent[] = [
   {
@@ -46,8 +46,19 @@ const FIXTURES: CreateEvent[] = [
   },
 ];
 
-function createMemoryStore(seed: EventRow[] = []): EventStore {
+const INSIGHT_FIXTURES: CreateInsight[] = [
+  { title: "Top Trade Income Growth", value: "+18%" },
+  { title: "Apprenticeship Placement Rate", value: "91%" },
+  { title: "University 4-year ROI", value: "+6%" },
+  { title: "Automation Displacement Risk", value: "−12%" },
+];
+
+function createMemoryStore(
+  seed: EventRow[] = [],
+  insightSeed: InsightRow[] = []
+): Store {
   const rows = [...seed];
+  const insights = [...insightSeed];
   return {
     async insertEvent(value) {
       const row: EventRow = {
@@ -66,6 +77,30 @@ function createMemoryStore(seed: EventRow[] = []): EventStore {
           return byTime !== 0 ? byTime : b.id.localeCompare(a.id);
         })
         .slice(0, limit);
+    },
+    async upsertInsight(value) {
+      const existing = insights.find((row) => row.title === value.title);
+      const now = new Date().toISOString();
+      if (existing) {
+        existing.value = value.value;
+        existing.updated_at = now;
+        return { row: { ...existing }, created: false };
+      }
+      const row: InsightRow = {
+        id: crypto.randomUUID(),
+        title: value.title,
+        value: value.value,
+        created_at: now,
+        updated_at: now,
+      };
+      insights.unshift(row);
+      return { row, created: true };
+    },
+    async listInsights() {
+      return [...insights].sort((a, b) => {
+        const byTime = b.updated_at.localeCompare(a.updated_at);
+        return byTime !== 0 ? byTime : a.title.localeCompare(b.title);
+      });
     },
   };
 }
@@ -102,7 +137,18 @@ function seedRows(): EventRow[] {
 
 const port = Number(process.env.PORT) || 3000;
 const host = process.env.HOST || "127.0.0.1";
-const app = createApp(createMemoryStore(seedRows()), { logger: true });
+function seedInsights(): InsightRow[] {
+  const start = Date.parse("2026-09-21T08:00:00.000Z");
+  return INSIGHT_FIXTURES.map((value, i) => ({
+    id: `22222222-0000-4000-8000-${String(i + 1).padStart(12, "0")}`,
+    title: value.title,
+    value: value.value,
+    created_at: new Date(start).toISOString(),
+    updated_at: new Date(start + i * 60_000).toISOString(),
+  }));
+}
+
+const app = createApp(createMemoryStore(seedRows(), seedInsights()), { logger: true });
 
 app.listen({ port, host }).then(
   () => {

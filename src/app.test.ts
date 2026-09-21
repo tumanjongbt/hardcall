@@ -3,13 +3,21 @@ import http from "node:http";
 import { test } from "node:test";
 import { createApp } from "./app";
 import { createSseHub, formatSseMessage } from "./sse_hub";
-import type { CreateEvent, EventRow, EventStore } from "./types";
+import type {
+  CreateEvent,
+  CreateInsight,
+  EventRow,
+  InsightRow,
+  Store,
+} from "./types";
 
 function memoryStore(
   onInsert?: (value: CreateEvent) => EventRow | Promise<EventRow>,
-  seed: EventRow[] = []
-): EventStore {
+  seed: EventRow[] = [],
+  insightSeed: InsightRow[] = []
+): Store {
   const rows = [...seed];
+  const insights = [...insightSeed];
   return {
     async insertEvent(value) {
       if (onInsert) return onInsert(value);
@@ -29,6 +37,30 @@ function memoryStore(
           return byTime !== 0 ? byTime : b.id.localeCompare(a.id);
         })
         .slice(0, limit);
+    },
+    async upsertInsight(value: CreateInsight) {
+      const existing = insights.find((row) => row.title === value.title);
+      const now = "2026-09-21T12:00:00.000Z";
+      if (existing) {
+        existing.value = value.value;
+        existing.updated_at = now;
+        return { row: { ...existing }, created: false };
+      }
+      const row: InsightRow = {
+        id: "660e8400-e29b-41d4-a716-446655440000",
+        title: value.title,
+        value: value.value,
+        created_at: now,
+        updated_at: now,
+      };
+      insights.unshift(row);
+      return { row, created: true };
+    },
+    async listInsights() {
+      return [...insights].sort((a, b) => {
+        const byTime = b.updated_at.localeCompare(a.updated_at);
+        return byTime !== 0 ? byTime : a.title.localeCompare(b.title);
+      });
     },
   };
 }
@@ -165,12 +197,18 @@ test("GET /api/events validation failures", async () => {
 });
 
 test("GET /api/events persist failure is opaque", async () => {
-  const store: EventStore = {
+  const store: Store = {
     async insertEvent() {
       throw new Error("unused");
     },
     async listEvents() {
       throw new Error("ECONNREFUSED secret-host");
+    },
+    async upsertInsight() {
+      throw new Error("unused");
+    },
+    async listInsights() {
+      throw new Error("unused");
     },
   };
   await withApp(store, async (app) => {
@@ -465,6 +503,168 @@ test("GET /api/events/stream fans out to multiple listeners", async () => {
     b.close();
     await app.close();
   }
+});
+
+const insightSeed: InsightRow[] = [
+  {
+    id: "00000000-0000-4000-8000-000000000011",
+    title: "University 4-year ROI",
+    value: "+6%",
+    created_at: "2026-09-20T10:00:00.000Z",
+    updated_at: "2026-09-20T10:00:00.000Z",
+  },
+  {
+    id: "00000000-0000-4000-8000-000000000012",
+    title: "Top Trade Income Growth",
+    value: "+18%",
+    created_at: "2026-09-21T09:00:00.000Z",
+    updated_at: "2026-09-21T11:00:00.000Z",
+  },
+];
+
+test("GET /api/insights returns updated_at DESC", async () => {
+  await withApp(memoryStore(undefined, [], insightSeed), async (app) => {
+    const res = await app.inject({ method: "GET", url: "/api/insights" });
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.headers["access-control-allow-origin"], "*");
+    const body = res.json() as { insights: InsightRow[] };
+    assert.deepEqual(
+      body.insights.map((row) => row.title),
+      ["Top Trade Income Growth", "University 4-year ROI"]
+    );
+  });
+});
+
+test("POST /api/insight inserts then upserts on exact title", async () => {
+  await withApp(memoryStore(), async (app) => {
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/insight",
+      headers: { "content-type": "application/json" },
+      payload: {
+        title: "  Top Trade Income Growth  ",
+        value: "  +18%  ",
+      },
+    });
+    assert.equal(created.statusCode, 201);
+    assert.deepEqual(created.json(), {
+      id: "660e8400-e29b-41d4-a716-446655440000",
+      title: "Top Trade Income Growth",
+      value: "+18%",
+      created_at: "2026-09-21T12:00:00.000Z",
+      updated_at: "2026-09-21T12:00:00.000Z",
+    });
+
+    const updated = await app.inject({
+      method: "POST",
+      url: "/api/insight",
+      headers: { "content-type": "application/json" },
+      payload: { title: "Top Trade Income Growth", value: "+21%" },
+    });
+    assert.equal(updated.statusCode, 200);
+    const row = updated.json() as InsightRow;
+    assert.equal(row.id, "660e8400-e29b-41d4-a716-446655440000");
+    assert.equal(row.value, "+21%");
+    assert.equal(row.created_at, "2026-09-21T12:00:00.000Z");
+
+    const listed = await app.inject({ method: "GET", url: "/api/insights" });
+    assert.equal((listed.json() as { insights: InsightRow[] }).insights.length, 1);
+  });
+});
+
+test("POST /api/insight validation failures", async () => {
+  await withApp(memoryStore(), async (app) => {
+    const cases: Array<{ payload: unknown; field: string; rule: string }> = [
+      { payload: { value: "+18%" }, field: "title", rule: "required" },
+      { payload: { title: "ROI" }, field: "value", rule: "required" },
+      { payload: { title: "", value: "+18%" }, field: "title", rule: "length_1_200" },
+      { payload: { title: "ROI", value: "  " }, field: "value", rule: "length_1_500" },
+      { payload: { title: "ROI", value: "+18%", extra: 1 }, field: "extra", rule: "unknown_key" },
+    ];
+
+    for (const c of cases) {
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/insight",
+        headers: { "content-type": "application/json" },
+        payload: c.payload,
+      });
+      assert.equal(res.statusCode, 400, JSON.stringify(c));
+      const body = res.json() as {
+        error: string;
+        details: { field: string; rule: string }[];
+      };
+      assert.equal(body.error, "validation_failed");
+      assert.ok(
+        body.details.some((d) => d.field === c.field && d.rule === c.rule),
+        JSON.stringify(body.details)
+      );
+    }
+  });
+});
+
+test("POST /api/insight rejects non-JSON", async () => {
+  await withApp(memoryStore(), async (app) => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/insight",
+      headers: { "content-type": "text/plain" },
+      payload: "title=ROI",
+    });
+    assert.equal(res.statusCode, 415);
+    assert.deepEqual(res.json(), { error: "unsupported_media_type" });
+  });
+});
+
+test("GET /api/insights persist failure is opaque", async () => {
+  const store: Store = {
+    async insertEvent() {
+      throw new Error("unused");
+    },
+    async listEvents() {
+      throw new Error("unused");
+    },
+    async upsertInsight() {
+      throw new Error("unused");
+    },
+    async listInsights() {
+      throw new Error("ECONNREFUSED secret-host");
+    },
+  };
+  await withApp(store, async (app) => {
+    const res = await app.inject({ method: "GET", url: "/api/insights" });
+    assert.equal(res.statusCode, 500);
+    assert.deepEqual(res.json(), { error: "persist_failed" });
+    assert.equal(res.body.includes("secret-host"), false);
+  });
+});
+
+test("POST /api/insight persist failure is opaque", async () => {
+  const store: Store = {
+    async insertEvent() {
+      throw new Error("unused");
+    },
+    async listEvents() {
+      throw new Error("unused");
+    },
+    async upsertInsight() {
+      throw new Error("ECONNREFUSED secret-host");
+    },
+    async listInsights() {
+      throw new Error("unused");
+    },
+  };
+  await withApp(store, async (app) => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/insight",
+      headers: { "content-type": "application/json" },
+      payload: { title: "Top Trade Income Growth", value: "+18%" },
+    });
+    assert.equal(res.statusCode, 500);
+    assert.deepEqual(res.json(), { error: "persist_failed" });
+    assert.equal(res.body.includes("secret-host"), false);
+  });
 });
 
 test("POST /api/events persist failure is opaque", async () => {

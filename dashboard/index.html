@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Hardcall — event feed</title>
+    <title>Hardcall — career market</title>
     <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>
@@ -16,49 +16,65 @@
         <div id="stream-status" aria-live="polite"></div>
       </header>
 
-      <section class="panel" aria-label="Feed filters">
-        <div class="controls">
-          <div>
-            <span class="control-label" id="channel-label">Channel</span>
-            <div
-              id="channel-filters"
-              class="chip-row"
-              role="group"
-              aria-labelledby="channel-label"
-            ></div>
+      <nav id="tabs" class="tabs" aria-label="Dashboard views"></nav>
+
+      <div id="events-view">
+        <section class="panel" aria-label="Feed filters">
+          <div class="controls">
+            <div>
+              <span class="control-label" id="channel-label">Channel</span>
+              <div
+                id="channel-filters"
+                class="chip-row"
+                role="group"
+                aria-labelledby="channel-label"
+              ></div>
+            </div>
+            <div>
+              <label class="control-label" for="search">Search</label>
+              <input
+                id="search"
+                class="search"
+                type="search"
+                placeholder="Title, description, or tags"
+                autocomplete="off"
+              />
+            </div>
+            <div>
+              <span class="control-label" id="per-page-label">Per page</span>
+              <div
+                id="per-page"
+                class="chip-row"
+                role="group"
+                aria-labelledby="per-page-label"
+              ></div>
+            </div>
           </div>
-          <div>
-            <label class="control-label" for="search">Search</label>
-            <input
-              id="search"
-              class="search"
-              type="search"
-              placeholder="Title, description, or tags"
-              autocomplete="off"
-            />
-          </div>
-          <div>
-            <span class="control-label" id="per-page-label">Per page</span>
-            <div
-              id="per-page"
-              class="chip-row"
-              role="group"
-              aria-labelledby="per-page-label"
-            ></div>
-          </div>
+        </section>
+
+        <div class="toolbar">
+          <p id="feed-meta"></p>
         </div>
-      </section>
+        <main id="feed" aria-live="polite"></main>
+        <nav id="pagination" class="pagination" aria-label="Pagination"></nav>
 
-      <div class="toolbar">
-        <p id="feed-meta"></p>
+        <p class="footnote">
+          History from <code>GET /api/events</code>. Live rows from
+          <code>GET /api/events/stream</code>. Filters live in the URL so a counselor can bookmark this view.
+        </p>
       </div>
-      <main id="feed" aria-live="polite"></main>
-      <nav id="pagination" class="pagination" aria-label="Pagination"></nav>
 
-      <p class="footnote">
-        History from <code>GET /api/events</code>. Live rows from
-        <code>GET /api/events/stream</code>. Filters live in the URL so a counselor can bookmark this view.
-      </p>
+      <div id="insights-view" hidden>
+        <div class="toolbar">
+          <p id="insights-meta"></p>
+        </div>
+        <section id="insights" aria-label="Market insights" aria-live="polite"></section>
+        <p class="footnote">
+          KPI cards from <code>GET /api/insights</code>, newest <code>updated_at</code> first.
+          The dashboard polls every 15 seconds. Publish or refresh a card with
+          <code>POST /api/insight</code> (exact title upsert).
+        </p>
+      </div>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
