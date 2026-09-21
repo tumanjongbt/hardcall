@@ -120,6 +120,9 @@ export function parseViewState(search: string): ViewState {
 
 export function serializeViewState(state: ViewState): string {
   const params = new URLSearchParams();
+  const range = state.range ?? DEFAULT_RANGE;
+  const forecast = state.forecast ?? DEFAULT_FORECAST;
+  const compare = state.compare ?? [...DEFAULT_COMPARE];
   if (state.tab !== DEFAULT_TAB) params.set("tab", state.tab);
   params.set("page", String(state.page));
   params.set("perPage", String(state.perPage));
@@ -130,14 +133,14 @@ export function serializeViewState(state: ViewState): string {
     params.set("insight", state.insight);
   }
   if (state.lens) params.set("lens", state.lens);
-  if (state.range && state.range !== DEFAULT_RANGE) params.set("range", String(state.range));
-  if (state.forecast && state.forecast !== DEFAULT_FORECAST) {
-    params.set("forecast", String(state.forecast));
+  if (range !== DEFAULT_RANGE) params.set("range", String(range));
+  if (forecast !== DEFAULT_FORECAST) {
+    params.set("forecast", String(forecast));
   }
-  if (state.compare.length === 0) {
+  if (compare.length === 0) {
     params.set("compare", "none");
-  } else if (!comparesAreDefault(state.compare)) {
-    params.set("compare", state.compare.join(","));
+  } else if (!comparesAreDefault(compare)) {
+    params.set("compare", compare.join(","));
   }
   return params.toString();
 }

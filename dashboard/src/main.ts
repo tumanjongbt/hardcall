@@ -1,5 +1,6 @@
 import { fetchEvents, fetchInsights, postEvent, subscribeEvents } from "./api";
 import { renderCharts, teardownCharts } from "./charts/renderCharts";
+import { renderChartFilters } from "./charts/controls";
 import { apiBase, INSIGHTS_POLL_MS, PLAYGROUND_TOAST_MS, SEARCH_DEBOUNCE_MS } from "./config";
 import { debounce } from "./debounce";
 import { findInsight } from "./insights";
@@ -11,7 +12,7 @@ import {
   normalizeChannel,
   type PlaygroundForm,
 } from "./playground";
-import { filterEvents, paginate } from "./query";
+import { filterByLens, filterEvents, paginate } from "./query";
 import {
   renderChannels,
   renderFeed,
