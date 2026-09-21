@@ -1,4 +1,5 @@
 import { apiBase, LIST_FETCH_LIMIT } from "./config";
+import { formatApiError } from "./playground";
 import type { EventRow, InsightRow, StreamStatus } from "./types";
 
 export function parseInsightsPayload(body: unknown): InsightRow[] {
@@ -31,6 +32,37 @@ export async function fetchEvents(base = apiBase()): Promise<EventRow[]> {
     throw new Error("invalid_list_payload");
   }
   return body.events as EventRow[];
+}
+
+export async function postEvent(
+  payload: unknown,
+  base = apiBase()
+): Promise<EventRow> {
+  const res = await fetch(`${base}/api/events`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const raw = await res.text();
+  let parsed: unknown = null;
+  if (raw) {
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      parsed = null;
+    }
+  }
+  if (res.status !== 200 && res.status !== 201) {
+    const error = new Error(formatApiError(res.status, parsed, raw)) as Error & {
+      status: number;
+    };
+    error.status = res.status;
+    throw error;
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error(`HTTP ${res.status}: invalid_event_payload`);
+  }
+  return parsed as EventRow;
 }
 
 export async function fetchInsights(base = apiBase()): Promise<InsightRow[]> {

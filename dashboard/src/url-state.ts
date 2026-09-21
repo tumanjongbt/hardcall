@@ -17,8 +17,9 @@ export function defaultViewState(): ViewState {
 }
 
 export function parseTab(value: string | null): DashboardTab {
-  if (value === "insights") return "insights";
-  if (value === "charts") return "charts";
+  if (value === "insights" || value === "charts" || value === "playground") {
+    return value;
+  }
   return "events";
 }
 
