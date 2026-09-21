@@ -24,7 +24,17 @@ export function channelLabel(channel: string): string {
   return isChannel(channel) ? CHANNEL_LABELS[channel] : channel;
 }
 
-export const TAG_LABELS: Record<string, string> = {
+export const TAGS = [
+  "high_school_students",
+  "college_students",
+  "parents",
+  "career_counselors",
+  "workforce_training_managers",
+] as const;
+
+export type StakeholderTag = (typeof TAGS)[number];
+
+export const TAG_LABELS: Record<StakeholderTag, string> = {
   high_school_students: "High school students",
   college_students: "College students",
   parents: "Parents",
@@ -74,7 +84,9 @@ export const HUMAN_CHANNELS = [
 ] as const;
 
 export function tagLabel(tag: string): string {
-  return TAG_LABELS[tag] ?? tag.replaceAll("_", " ");
+  return tag in TAG_LABELS
+    ? TAG_LABELS[tag as StakeholderTag]
+    : tag.replaceAll("_", " ");
 }
 
 export function isAudienceLens(value: string): value is AudienceLensId {

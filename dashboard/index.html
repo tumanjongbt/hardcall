@@ -91,6 +91,111 @@
           optional <code>detail</code>).
         </p>
       </div>
+
+      <div id="playground-view" hidden>
+        <div class="toolbar">
+          <p id="playground-meta"></p>
+        </div>
+        <div class="playground-layout">
+          <section class="panel" aria-labelledby="playground-form-title">
+            <h2 id="playground-form-title" class="panel-title">Mock ingest</h2>
+            <p class="panel-lede">
+              Build a scraper payload against the live event contract. The fetch
+              preview updates on every keystroke — Submit fires that exact call.
+            </p>
+            <form id="playground-form" class="playground-form" novalidate>
+              <label class="control-label" for="playground-channel">Channel</label>
+              <select id="playground-channel" class="field" name="channel" required>
+                <option value="university">University</option>
+                <option value="community_college">Community College</option>
+                <option value="trade">Trade</option>
+                <option value="apprenticeship">Apprenticeship</option>
+                <option value="automation">Automation</option>
+              </select>
+
+              <label class="control-label" for="playground-title">Title (required)</label>
+              <input
+                id="playground-title"
+                class="field"
+                name="title"
+                type="text"
+                maxlength="200"
+                aria-required="true"
+                placeholder="CS starting salaries up in metro X"
+                autocomplete="off"
+              />
+
+              <label class="control-label" for="playground-description">Description</label>
+              <textarea
+                id="playground-description"
+                class="field field--area"
+                name="description"
+                rows="4"
+                maxlength="4000"
+                placeholder="Optional context: wage growth, outlook, education path…"
+              ></textarea>
+
+              <label class="control-label" for="playground-emoji">Emoji / icon</label>
+              <input
+                id="playground-emoji"
+                class="field"
+                name="emoji"
+                type="text"
+                maxlength="16"
+                placeholder="📈"
+                autocomplete="off"
+              />
+
+              <fieldset class="tag-fieldset">
+                <legend class="control-label">Stakeholder tags</legend>
+                <label class="check">
+                  <input type="checkbox" name="tags" value="high_school_students" />
+                  High school students
+                </label>
+                <label class="check">
+                  <input type="checkbox" name="tags" value="college_students" />
+                  College students
+                </label>
+                <label class="check">
+                  <input type="checkbox" name="tags" value="parents" />
+                  Parents
+                </label>
+                <label class="check">
+                  <input type="checkbox" name="tags" value="career_counselors" />
+                  Career counselors
+                </label>
+                <label class="check">
+                  <input type="checkbox" name="tags" value="workforce_training_managers" />
+                  Workforce training managers
+                </label>
+              </fieldset>
+
+              <div id="playground-error" class="banner banner--error" hidden role="alert"></div>
+
+              <button id="playground-submit" class="submit" type="submit">
+                Submit event
+              </button>
+            </form>
+          </section>
+
+          <section class="panel playground-code-panel" aria-labelledby="playground-preview-title">
+            <h2 id="playground-preview-title" class="panel-title">Live fetch()</h2>
+            <p class="panel-lede">
+              Native JavaScript a scraper would run. URL, POST, JSON headers, and
+              body track the form.
+            </p>
+            <pre class="code-block" tabindex="0"><code id="playground-fetch" class="language-js"></code></pre>
+          </section>
+        </div>
+        <div id="playground-toast" class="toast" hidden role="status" aria-live="polite"></div>
+        <p class="footnote">
+          Playground posts to <code>POST /api/events</code> at
+          <code>VITE_EVENTS_API_URL</code> (default
+          <code>https://hardcall-api.onrender.com</code>). Open with
+          <code>?tab=playground</code>. Bulk synthetic records:
+          <code>prompts/MOCK_INGESTION_SCRIPT_PROMPT.md</code>.
+        </p>
+      </div>
     </div>
     <div id="insight-detail" hidden></div>
     <script type="module" src="/src/main.ts"></script>

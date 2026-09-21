@@ -1,19 +1,30 @@
-import { fetchEvents, fetchInsights, subscribeEvents } from "./api";
-import { INSIGHTS_POLL_MS, SEARCH_DEBOUNCE_MS } from "./config";
-import { debounce } from "./debounce";
-import { filterByLens, filterEvents, paginate } from "./query";
-import { findInsight } from "./insights";
-import { renderChartFilters } from "./charts/controls";
+import { fetchEvents, fetchInsights, postEvent, subscribeEvents } from "./api";
 import { renderCharts, teardownCharts } from "./charts/renderCharts";
+import { apiBase, INSIGHTS_POLL_MS, PLAYGROUND_TOAST_MS, SEARCH_DEBOUNCE_MS } from "./config";
+import { debounce } from "./debounce";
+import { findInsight } from "./insights";
+import {
+  buildEventPayload,
+  createdEventSummary,
+  fetchSnippet,
+  isStakeholderTag,
+  normalizeChannel,
+  type PlaygroundForm,
+} from "./playground";
+import { filterEvents, paginate } from "./query";
 import {
   renderChannels,
   renderFeed,
+  renderFetchPreview,
   renderInsightDetail,
   renderInsights,
   renderInsightsMeta,
   renderMeta,
   renderPagination,
   renderPerPage,
+  renderPlaygroundError,
+  renderPlaygroundMeta,
+  renderPlaygroundToast,
   renderStatus,
   renderTabs,
 } from "./render";
@@ -38,6 +49,17 @@ const paginationEl = must("#pagination");
 const insightsEl = must("#insights");
 const insightsMetaEl = must("#insights-meta");
 const insightDetailEl = must("#insight-detail");
+const playgroundViewEl = must("#playground-view");
+const playgroundFormEl = must<HTMLFormElement>("#playground-form");
+const playgroundFetchEl = must("#playground-fetch");
+const playgroundErrorEl = must("#playground-error");
+const playgroundToastEl = must("#playground-toast");
+const playgroundMetaEl = must("#playground-meta");
+const playgroundSubmitEl = must<HTMLButtonElement>("#playground-submit");
+const playgroundChannelEl = must<HTMLSelectElement>("#playground-channel");
+const playgroundTitleEl = must<HTMLInputElement>("#playground-title");
+const playgroundDescriptionEl = must<HTMLTextAreaElement>("#playground-description");
+const playgroundEmojiEl = must<HTMLInputElement>("#playground-emoji");
 
 let allEvents: EventRow[] = [];
 let insights: InsightRow[] = [];
@@ -49,6 +71,10 @@ let loading = true;
 let insightsError: string | null = null;
 let insightsLoading = true;
 let insightsLoadedAt: string | null = null;
+let playgroundSubmitting = false;
+let playgroundError: string | null = null;
+let playgroundToast: { id: string; title: string } | null = null;
+let playgroundToastTimer: number | null = null;
 
 function must<T extends HTMLElement = HTMLElement>(selector: string): T {
   const node = document.querySelector<T>(selector);
@@ -95,7 +121,9 @@ function paint(): void {
   eventsViewEl.hidden = model.view.tab !== "events";
   chartsViewEl.hidden = model.view.tab !== "charts";
   insightsViewEl.hidden = model.view.tab !== "insights";
-  eventFiltersEl.hidden = model.view.tab === "insights";
+  playgroundViewEl.hidden = model.view.tab !== "playground";
+  eventFiltersEl.hidden =
+    model.view.tab === "insights" || model.view.tab === "playground";
   perPageBlockEl.hidden = model.view.tab !== "events";
   renderChannels(channelsEl, model.view, setChannel);
   renderPerPage(perPageEl, model.view, setPerPage);
@@ -126,6 +154,7 @@ function paint(): void {
     view.tab === "insights" ? findInsight(insights, view.insight) : null,
     closeInsight
   );
+  if (model.view.tab === "playground") paintPlayground();
   if (searchEl.value !== model.view.q && document.activeElement !== searchEl) {
     searchEl.value = model.view.q;
   }
@@ -201,6 +230,93 @@ function setPerPage(perPage: ViewState["perPage"]): void {
 function setPage(page: number): void {
   if (page === view.page) return;
   pushView({ ...view, page });
+}
+
+function readPlaygroundForm(): PlaygroundForm {
+  const tags = [
+    ...playgroundFormEl.querySelectorAll<HTMLInputElement>('input[name="tags"]:checked'),
+  ]
+    .map((input) => input.value)
+    .filter(isStakeholderTag);
+  return {
+    channel: normalizeChannel(playgroundChannelEl.value),
+    title: playgroundTitleEl.value,
+    description: playgroundDescriptionEl.value,
+    emoji: playgroundEmojiEl.value,
+    tags,
+  };
+}
+
+function paintPlayground(): void {
+  const origin = apiBase();
+  renderPlaygroundMeta(playgroundMetaEl, origin);
+  renderFetchPreview(
+    playgroundFetchEl,
+    fetchSnippet(origin, buildEventPayload(readPlaygroundForm()))
+  );
+  renderPlaygroundError(playgroundErrorEl, playgroundError);
+  renderPlaygroundToast(playgroundToastEl, playgroundToast, dismissPlaygroundToast);
+  playgroundSubmitEl.disabled = playgroundSubmitting;
+  playgroundSubmitEl.setAttribute("aria-busy", playgroundSubmitting ? "true" : "false");
+  playgroundSubmitEl.textContent = playgroundSubmitting ? "Submitting…" : "Submit event";
+}
+
+function dismissPlaygroundToast(): void {
+  playgroundToast = null;
+  if (playgroundToastTimer !== null) {
+    window.clearTimeout(playgroundToastTimer);
+    playgroundToastTimer = null;
+  }
+  renderPlaygroundToast(playgroundToastEl, null, dismissPlaygroundToast);
+}
+
+function showPlaygroundToast(summary: { id: string; title: string }): void {
+  playgroundToast = summary;
+  if (playgroundToastTimer !== null) window.clearTimeout(playgroundToastTimer);
+  playgroundToastTimer = window.setTimeout(() => {
+    dismissPlaygroundToast();
+  }, PLAYGROUND_TOAST_MS);
+  renderPlaygroundToast(playgroundToastEl, playgroundToast, dismissPlaygroundToast);
+}
+
+playgroundFormEl.addEventListener("input", () => {
+  if (view.tab === "playground") {
+    renderFetchPreview(
+      playgroundFetchEl,
+      fetchSnippet(apiBase(), buildEventPayload(readPlaygroundForm()))
+    );
+  }
+});
+playgroundFormEl.addEventListener("change", () => {
+  if (view.tab === "playground") {
+    renderFetchPreview(
+      playgroundFetchEl,
+      fetchSnippet(apiBase(), buildEventPayload(readPlaygroundForm()))
+    );
+  }
+});
+
+playgroundFormEl.addEventListener("submit", (event) => {
+  event.preventDefault();
+  void submitPlayground();
+});
+
+async function submitPlayground(): Promise<void> {
+  if (playgroundSubmitting) return;
+  playgroundSubmitting = true;
+  playgroundError = null;
+  paintPlayground();
+  const payload = buildEventPayload(readPlaygroundForm());
+  try {
+    const row = await postEvent(payload);
+    showPlaygroundToast(createdEventSummary(row));
+    prependLive(row);
+  } catch (err) {
+    playgroundError = err instanceof Error ? err.message : "Request failed.";
+  } finally {
+    playgroundSubmitting = false;
+    paintPlayground();
+  }
 }
 
 const commitSearch = debounce((q: string) => {
