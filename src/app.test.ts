@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
+import http from "node:http";
 import { test } from "node:test";
 import { createApp } from "./app";
+import { createSseHub, formatSseMessage } from "./sse_hub";
 import type { CreateEvent, EventRow, EventStore } from "./types";
 
 function memoryStore(onInsert?: (value: CreateEvent) => EventRow | Promise<EventRow>): EventStore {
@@ -168,6 +170,159 @@ test("POST /api/events rejects non-JSON", async () => {
     assert.equal(res.statusCode, 415);
     assert.deepEqual(res.json(), { error: "unsupported_media_type" });
   });
+});
+
+function listenPort(app: ReturnType<typeof createApp>): number {
+  const addr = app.server.address();
+  if (typeof addr === "object" && addr) return addr.port;
+  throw new Error("missing listen port");
+}
+
+function parseSseFrame(frame: string): { comments: string[]; data?: string; event?: string; retry?: string } {
+  const comments: string[] = [];
+  let data: string | undefined;
+  let event: string | undefined;
+  let retry: string | undefined;
+  for (const rawLine of frame.split("\n")) {
+    if (rawLine.startsWith(":")) {
+      comments.push(rawLine.slice(1).replace(/^ /, ""));
+      continue;
+    }
+    const colon = rawLine.indexOf(":");
+    if (colon === -1) continue;
+    const field = rawLine.slice(0, colon);
+    let value = rawLine.slice(colon + 1);
+    if (value.startsWith(" ")) value = value.slice(1);
+    if (field === "data") data = (data ?? "") + value;
+    else if (field === "event") event = value;
+    else if (field === "retry") retry = value;
+  }
+  return { comments, data, event, retry };
+}
+
+function openSse(port: number): Promise<{
+  frames: ReturnType<typeof parseSseFrame>[];
+  close: () => void;
+  waitFor: (pred: () => boolean, ms?: number) => Promise<void>;
+}> {
+  return new Promise((resolve, reject) => {
+    const frames: ReturnType<typeof parseSseFrame>[] = [];
+    let buf = "";
+    const req = http.get(
+      {
+        hostname: "127.0.0.1",
+        port,
+        path: "/api/events/stream",
+        headers: { accept: "text/event-stream" },
+      },
+      (res) => {
+        if (res.statusCode !== 200) {
+          reject(new Error(`SSE status ${res.statusCode}`));
+          return;
+        }
+        assert.match(String(res.headers["content-type"]), /text\/event-stream/);
+        res.setEncoding("utf8");
+        res.on("data", (chunk: string) => {
+          buf += chunk;
+          let idx: number;
+          while ((idx = buf.indexOf("\n\n")) !== -1) {
+            const raw = buf.slice(0, idx);
+            buf = buf.slice(idx + 2);
+            if (raw.length) frames.push(parseSseFrame(raw));
+          }
+        });
+        resolve({
+          frames,
+          close: () => {
+            req.destroy();
+            res.destroy();
+          },
+          waitFor: (pred, ms = 2000) =>
+            new Promise((ok, fail) => {
+              const start = Date.now();
+              const timer = setInterval(() => {
+                if (pred()) {
+                  clearInterval(timer);
+                  ok();
+                } else if (Date.now() - start > ms) {
+                  clearInterval(timer);
+                  fail(new Error("SSE wait timeout"));
+                }
+              }, 10);
+            }),
+        });
+      }
+    );
+    req.on("error", reject);
+  });
+}
+
+test("GET /api/events/stream broadcasts POST rows as SSE messages", async () => {
+  const hub = createSseHub();
+  const app = createApp(memoryStore(), { hub, heartbeatMs: 40 });
+  await app.listen({ port: 0, host: "127.0.0.1" });
+  const port = listenPort(app);
+  const client = await openSse(port);
+  try {
+    await client.waitFor(() =>
+      client.frames.some((f) => f.retry === "5000" || f.comments.includes("connected"))
+    );
+    assert.equal(hub.clientCount(), 1);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/events",
+      headers: { "content-type": "application/json" },
+      payload: {
+        channel: "university",
+        title: "streamed row",
+        emoji: "📈",
+        tags: ["parents"],
+      },
+    });
+    assert.equal(res.statusCode, 201);
+    const row = res.json() as EventRow;
+
+    await client.waitFor(() => client.frames.some((f) => f.data && JSON.parse(f.data).id === row.id));
+    const message = client.frames.find((f) => f.data && JSON.parse(f.data).id === row.id);
+    assert.ok(message);
+    assert.equal(message.event, "message");
+    assert.deepEqual(JSON.parse(message.data as string), row);
+    assert.equal(formatSseMessage(row), `event: message\ndata: ${JSON.stringify(row)}\n\n`);
+
+    await client.waitFor(() => client.frames.some((f) => f.comments.includes("keepalive")));
+  } finally {
+    client.close();
+    await client.waitFor(() => hub.clientCount() === 0).catch(() => undefined);
+    await app.close();
+  }
+  assert.equal(hub.clientCount(), 0);
+});
+
+test("GET /api/events/stream fans out to multiple listeners", async () => {
+  const app = createApp(memoryStore());
+  await app.listen({ port: 0, host: "127.0.0.1" });
+  const port = listenPort(app);
+  const a = await openSse(port);
+  const b = await openSse(port);
+  try {
+    await a.waitFor(() => a.frames.some((f) => f.comments.includes("connected")));
+    await b.waitFor(() => b.frames.some((f) => f.comments.includes("connected")));
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/events",
+      headers: { "content-type": "application/json" },
+      payload: { channel: "automation", title: "two listeners" },
+    });
+    const row = res.json() as EventRow;
+    await a.waitFor(() => a.frames.some((f) => f.data?.includes(row.id)));
+    await b.waitFor(() => b.frames.some((f) => f.data?.includes(row.id)));
+  } finally {
+    a.close();
+    b.close();
+    await app.close();
+  }
 });
 
 test("POST /api/events persist failure is opaque", async () => {

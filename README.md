@@ -4,7 +4,7 @@ Real-time career intelligence pipeline — education ROI and automation resilien
 
 Tagline: *the call that shapes your orbit.*
 
-Phase 1 is the always-on ingest API and cloud Postgres store. Scrapers and data sources `POST /api/events`. The dashboard is later.
+Phase 1 is the always-on ingest API and cloud Postgres store. Scrapers and data sources `POST /api/events`. Phase 1.5 adds a live SSE stream for listening clients and a standalone `events` CLI. The dashboard is later.
 
 ## What ships
 
@@ -12,8 +12,9 @@ Phase 1 is the always-on ingest API and cloud Postgres store. Scrapers and data 
 | --- | --- |
 | Protostar migration | `migrations/001_events.sql` |
 | Orion request validation | `src/events_validate.js` |
-| HTTP contract | `contracts/POST_api_events.md` |
-| TypeScript API | `src/app.ts`, `src/server.ts` |
+| HTTP contracts | `contracts/POST_api_events.md`, `contracts/GET_api_events_stream.md` |
+| TypeScript API | `src/app.ts`, `src/server.ts`, `src/sse_hub.ts` |
+| `events` CLI | `cli/` (own package; see `cli/README.md`) |
 
 Table name is `events`. Schema identifiers stay product-neutral (no `hardcall` in DDL, routes, or error codes).
 
@@ -83,6 +84,7 @@ npm run build && npm start
 
 - `GET /health` → `{ "ok": true }`
 - `POST /api/events` → `201` + stored row, or `400` / `415` / `500` per the contract
+- `GET /api/events/stream` → SSE (`text/event-stream`); each new insert is an SSE `message` whose JSON matches the stored row
 
 ```bash
 curl -sS http://127.0.0.1:3000/health
@@ -96,6 +98,50 @@ curl -sS -X POST http://127.0.0.1:3000/api/events \
     "emoji": "📈",
     "tags": ["college_students", "parents"]
   }'
+```
+
+### Live stream (SSE)
+
+The stream stays open. After connect the server sends `retry: 5000` and a `: connected` comment, then comment heartbeats (`: keepalive`) so Render/proxies are less likely to idle-timeout the socket. There is no replay of past rows — only events created after you subscribe (in-memory hub; one Render instance).
+
+```bash
+# -N disables curl buffering so frames appear as they arrive
+curl -N https://hardcall-api.onrender.com/api/events/stream
+```
+
+```js
+const es = new EventSource("https://hardcall-api.onrender.com/api/events/stream");
+es.onmessage = (e) => {
+  const row = JSON.parse(e.data);
+  console.log(row.id, row.channel, row.title);
+};
+es.onerror = (err) => console.error(err);
+```
+
+Local:
+
+```bash
+curl -N http://127.0.0.1:3000/api/events/stream
+```
+
+### `events` CLI
+
+Standalone package in `cli/` (`cli/README.md`). Push a row without writing curl JSON:
+
+```bash
+node cli/src/events.js push \
+  --channel university \
+  --title "CS starting salaries up in metro X" \
+  --description "optional" \
+  --icon "📈" \
+  --tags college_students,parents
+```
+
+`--icon` maps to API `emoji`. `--tags` is a comma-separated list. Base URL is `--api-url` or `EVENTS_API_URL`, default `https://hardcall-api.onrender.com`. Prints the 201 JSON; exits non-zero on errors.
+
+```bash
+cd cli && npx --yes . push --channel trade --title "HVAC demand"
+cd cli && npm link   # then: events push --channel ...
 ```
 
 Invalid channel, title, tags, lengths, or unknown keys return:
@@ -148,4 +194,4 @@ After deploy, `GET https://<host>/health` should return `{ "ok": true }`. Then P
 
 ## Out of scope (later)
 
-Dashboard / feed / charts, scrapers, and ingest auth.
+Dashboard / feed / charts, scrapers, ingest auth, and multi-instance stream fan-out (today’s hub is in-process).

@@ -12,7 +12,7 @@
     "start": "node dist/server.js",
     "dev": "tsx watch src/server.ts",
     "migrate": "node dist/migrate.js",
-    "test": "node src/events_validate.test.js && tsx --test src/app.test.ts"
+    "test": "node src/events_validate.test.js && tsx --test src/app.test.ts src/sse_hub.test.ts && npm --prefix cli test"
   },
   "dependencies": {
     "@types/node": "^22.18.6",
