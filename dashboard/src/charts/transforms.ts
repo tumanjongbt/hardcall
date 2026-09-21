@@ -313,6 +313,10 @@ export function seriesTotal(series: ChannelSeries): number {
   return series.buckets.reduce((sum, bucket) => sum + bucket.count, 0);
 }
 
+export function compareIsEmpty(compare: CompareSeries | null): boolean {
+  return compare !== null && compare.totalA === 0 && compare.totalB === 0;
+}
+
 export function pathCompare(
   events: EventRow[],
   now: Date,

@@ -23,6 +23,8 @@ html,
 body {
   margin: 0;
   min-height: 100%;
+  max-width: 100%;
+  overflow-x: clip;
 }
 
 body {
@@ -34,9 +36,11 @@ body {
 }
 
 .sky {
-  width: min(1180px, calc(100% - 32px));
+  width: 100%;
+  max-width: 1180px;
   margin: 0 auto;
-  padding: 36px 0 72px;
+  padding: 36px 16px 72px;
+  min-width: 0;
 }
 
 .masthead {
@@ -548,10 +552,70 @@ body.has-insight-detail {
   color: var(--signal);
 }
 
+.charts-heading {
+  margin: 0 0 18px;
+  min-width: 0;
+}
+
+.charts-heading__title {
+  margin: 0;
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--paper-dim);
+}
+
+.charts-heading__decision {
+  margin: 6px 0 0;
+  font-size: clamp(1.05rem, 2.6vw, 1.35rem);
+  font-weight: 650;
+  line-height: 1.35;
+  max-width: 46rem;
+  overflow-wrap: anywhere;
+}
+
+#charts-view,
+#charts,
+#chart-filters {
+  min-width: 0;
+}
+
+.chart-filters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.chart-filter {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.chart-filter__hint {
+  margin: 8px 0 0;
+  color: var(--paper-dim);
+  font-size: 0.85rem;
+}
+
 .charts-meta {
   margin: 0 2px 16px;
   font-family: "Avenir Next", "Segoe UI", sans-serif;
   color: var(--paper-dim);
+  overflow-wrap: anywhere;
+}
+
+.charts-primary,
+.charts-more {
+  min-width: 0;
+}
+
+.charts-primary {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 14px;
 }
 
 .charts-grid {
@@ -559,11 +623,59 @@ body.has-insight-detail {
   grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
   gap: 14px;
   margin-bottom: 14px;
+  min-width: 0;
+}
+
+.charts-more {
+  background: color-mix(in srgb, #10061f 70%, var(--void));
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 4px 16px 14px;
+}
+
+.charts-more__summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 12px 2px;
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--paper);
+}
+
+.charts-more__summary::-webkit-details-marker {
+  display: none;
+}
+
+.charts-more__summary::before {
+  content: "▸";
+  display: inline-block;
+  margin-right: 8px;
+  color: var(--corona);
+}
+
+.charts-more[open] .charts-more__summary::before {
+  content: "▾";
+}
+
+.charts-more__summary:hover,
+.charts-more__summary:focus-visible {
+  color: var(--corona);
+  outline: none;
+}
+
+.charts-more__body {
+  display: grid;
+  gap: 14px;
+  padding-top: 4px;
+  min-width: 0;
 }
 
 .chart-bars {
   display: grid;
   gap: 14px;
+  min-width: 0;
 }
 
 .chart-panel {
@@ -571,6 +683,25 @@ body.has-insight-detail {
   border: 1px solid var(--line);
   border-radius: 18px;
   padding: 16px 18px 18px;
+  min-width: 0;
+  overflow-x: clip;
+}
+
+.chart-panel__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.chart-panel__head .chart-panel__title {
+  margin: 0;
+}
+
+.chart-panel__horizon {
+  justify-content: flex-end;
 }
 
 .chart-panel__title {
@@ -585,7 +716,7 @@ body.has-insight-detail {
 .chart-panel__informs {
   margin: 0 0 12px;
   color: var(--paper-dim);
-  font-size: 0.92rem;
+  font-size: 0.9rem;
 }
 
 .chart-panel__informs strong {
@@ -598,28 +729,130 @@ body.has-insight-detail {
 }
 
 .chart-panel__caption {
-  margin: 12px 0 0;
+  margin: 10px 0 0;
   color: var(--paper-dim);
   font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+.chart-panel__caption--forecast {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
 }
 
 .chart-panel--wide {
-  margin-bottom: 14px;
+  margin-bottom: 0;
+}
+
+.chart-empty {
+  margin: 24px 8px;
+  text-align: center;
+  color: var(--paper-dim);
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+}
+
+.non-advisory__chip {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  border-radius: 999px;
+  padding: 3px 10px;
+  border: 1px solid var(--corona);
+  background: color-mix(in srgb, var(--corona) 22%, var(--void));
+  color: var(--corona);
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  box-shadow: 0 0 16px color-mix(in srgb, var(--corona) 38%, transparent);
 }
 
 .chart-canvas-wrap {
   position: relative;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   height: 280px;
+  overflow: hidden;
+}
+
+.chart-canvas-wrap canvas {
+  display: block;
+  max-width: 100% !important;
 }
 
 .chart-canvas-wrap--doughnut {
   height: 300px;
-  max-width: 420px;
+  max-width: min(420px, 100%);
   margin: 0 auto;
 }
 
 .chart-canvas-wrap--bar {
   height: 220px;
+}
+
+.heat-host,
+.data-view-host {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.heat-table,
+.data-view {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-size: 0.85rem;
+}
+
+.heat-table th,
+.heat-table td,
+.data-view th,
+.data-view td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.heat-table caption,
+.data-view caption {
+  caption-side: bottom;
+  padding-top: 8px;
+  color: var(--paper-dim);
+  font-size: 0.78rem;
+  text-align: left;
+}
+
+.heat-cell {
+  text-align: center;
+  min-width: 2.2rem;
+}
+
+.data-view__so-what {
+  color: var(--paper-dim);
+  font-size: 0.82rem;
+}
+
+.resilience-meter {
+  height: 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--paper) 12%, transparent);
+  overflow: hidden;
+  margin-top: 12px;
+}
+
+.resilience-meter__fill {
+  height: 100%;
+  width: 0;
+  background: var(--signal);
 }
 
 .panel-title {
@@ -949,7 +1182,11 @@ select.field {
   }
 
   .charts-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .chart-filters {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .playground-layout {
@@ -960,5 +1197,43 @@ select.field {
     right: 16px;
     left: 16px;
     width: auto;
+  }
+}
+
+@media (max-width: 600px) {
+  .sky {
+    padding: 24px 12px 56px;
+  }
+
+  .chart-filters,
+  .charts-grid,
+  .charts-primary,
+  .chart-panel,
+  .chart-canvas-wrap,
+  .data-view-host,
+  .heat-host {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .chart-canvas-wrap {
+    height: min(240px, 62vw);
+  }
+
+  .chart-canvas-wrap--doughnut {
+    height: min(260px, 70vw);
+  }
+
+  .chart-panel {
+    padding: 14px 12px 14px;
+  }
+
+  .data-view .data-view__delta,
+  .data-view .data-view__delta-col {
+    display: none;
+  }
+
+  .heat-table {
+    min-width: 28rem;
   }
 }

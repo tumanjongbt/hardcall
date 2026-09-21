@@ -18,6 +18,11 @@
 
       <nav id="tabs" class="tabs" aria-label="Dashboard views"></nav>
 
+      <header id="charts-heading" class="charts-heading" hidden>
+        <h1 class="charts-heading__title">Charts</h1>
+        <p id="charts-decision" class="charts-heading__decision"></p>
+      </header>
+
       <section id="event-filters" class="panel" aria-label="Feed filters">
         <div class="controls">
           <div>
@@ -72,9 +77,12 @@
           plus live SSE), then apply the audience lens. Open <code>?tab=charts</code>.
           Channel chips and 300ms-debounced search still recompute every viz.
           Lookback is <code>range=7|14|30|90</code> (default 30; 90 is history).
-          Forecast band is <code>forecast=14|30</code>. Lens is <code>lens=</code>
-          or <code>stakeholder=</code>. Path compare is <code>compare=trade,university</code>.
-          The <strong>Not advice</strong> chip is always on — the band is telemetry, not a recommendation.
+          Forecast band chips live on the activity card (<code>forecast=14|30</code>).
+          Lens is <code>lens=</code> or <code>stakeholder=</code>.
+          Path compare is <code>compare=trade,university</code>.
+          Secondary mix, resilience, heat, and per-path bars stay behind
+          <strong>More views</strong>. The <strong>Not advice</strong> chip sits on
+          the forecast — the band is telemetry, not a recommendation.
         </p>
       </div>
 

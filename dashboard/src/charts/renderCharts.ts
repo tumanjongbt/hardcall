@@ -15,7 +15,7 @@ import {
   type ChartConfiguration,
 } from "chart.js";
 import { CHANNELS, CHANNEL_LABELS, LENS_LABELS, channelLabel } from "../channels";
-import type { EventRow, ViewState } from "../types";
+import type { EventRow, ForecastHorizon, ViewState } from "../types";
 import {
   CHANNEL_COLORS,
   CORONA,
@@ -28,9 +28,21 @@ import {
   STAKEHOLDER_COLORS,
   hexAlpha,
 } from "./colors";
-import { INFORMS, NON_ADVISORY, compareCaption, splitCaption } from "./copy";
 import {
+  CAPTIONS,
+  EMPTY_COMPARE,
+  FORECAST_NOTE,
+  INFORMS,
+  NON_ADVISORY,
+  compareCaption,
+  comparePairLabel,
+  splitCaption,
+  spikeCaption,
+} from "./copy";
+import {
+  FORECAST_HORIZONS,
   chartDataFromEvents,
+  compareIsEmpty,
   type ChannelRankRow,
   type ChannelSeries,
   type ChartData,
@@ -48,8 +60,22 @@ export type ChartsModel = {
   loadError: string | null;
 };
 
+export type ChartViewHandlers = {
+  onForecast: (horizon: ForecastHorizon) => void;
+};
+
 const instances = new Map<string, Chart>();
+const SECONDARY_CHART_KEYS = ["doughnut", "stacked", "split", "tags"] as const;
 let registered = false;
+let lastRender: {
+  root: HTMLElement;
+  model: ChartsModel;
+  now: Date;
+  handlers?: ChartViewHandlers;
+} | null = null;
+let lastWidth = 0;
+let resizeTimer = 0;
+let resizeObserver: ResizeObserver | null = null;
 
 function ensureRegistered(): void {
   if (registered) return;
@@ -80,10 +106,26 @@ function destroyChart(key: string): void {
   instances.delete(key);
 }
 
+function destroySecondaryCharts(): void {
+  for (const key of SECONDARY_CHART_KEYS) destroyChart(key);
+  for (const key of [...instances.keys()]) {
+    if (key.startsWith("bar:")) destroyChart(key);
+  }
+}
+
 export function teardownCharts(root?: HTMLElement): void {
   for (const chart of instances.values()) chart.destroy();
   instances.clear();
-  if (root) root.replaceChildren();
+  lastRender = null;
+  lastWidth = 0;
+  if (resizeObserver) {
+    resizeObserver.disconnect();
+    resizeObserver = null;
+  }
+  if (root) {
+    delete root.dataset.chartFp;
+    root.replaceChildren();
+  }
 }
 
 function el<K extends keyof HTMLElementTagNameMap>(
@@ -222,6 +264,7 @@ function activityConfig(
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      resizeDelay: 0,
       interaction: { mode: "index", intersect: false },
       plugins: {
         legend: {
@@ -269,6 +312,7 @@ function doughnutConfig(data: ChartData): ChartConfiguration<"doughnut"> {
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      resizeDelay: 0,
       plugins: {
         legend: {
           position: "bottom",
@@ -308,6 +352,7 @@ function stackedConfig(data: ChartData): ChartConfiguration<"line"> {
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      resizeDelay: 0,
       interaction: { mode: "index", intersect: false },
       plugins: {
         legend: {
@@ -353,6 +398,7 @@ function stakeholderConfig(slices: StakeholderSlice[]): ChartConfiguration<"bar"
       indexAxis: "y",
       responsive: true,
       maintainAspectRatio: false,
+      resizeDelay: 0,
       plugins: { legend: { display: false } },
       scales: {
         x: {
@@ -384,6 +430,7 @@ function splitConfig(data: ChartData): ChartConfiguration<"doughnut"> {
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      resizeDelay: 0,
       plugins: {
         legend: {
           position: "bottom",
@@ -436,6 +483,7 @@ function compareConfig(data: ChartData): ChartConfiguration<"line"> | null {
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      resizeDelay: 0,
       interaction: { mode: "index", intersect: false },
       plugins: {
         legend: {
@@ -478,6 +526,7 @@ function barConfig(series: ChannelSeries): ChartConfiguration<"bar"> {
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      resizeDelay: 0,
       plugins: { legend: { display: false } },
       scales: {
         x: {
@@ -512,12 +561,15 @@ function makeCanvas(id: string, aria: string): HTMLCanvasElement {
 
 function chartPanel(
   title: string,
-  inform: string,
   wrapClass: string,
-  canvas: HTMLCanvasElement
+  canvas: HTMLCanvasElement,
+  options: { inform?: string; caption?: string; id?: string } = {}
 ): HTMLElement {
   const section = el("section", "chart-panel");
-  section.append(panelTitle(title), informs(inform));
+  if (options.id) section.id = options.id;
+  section.append(panelTitle(title));
+  if (options.inform) section.append(informs(options.inform));
+  else if (options.caption) section.append(el("p", "chart-panel__caption", options.caption));
   const wrap = el("div", wrapClass);
   wrap.append(canvas);
   section.append(wrap);
@@ -533,11 +585,22 @@ function fingerprint(model: ChartsModel, data: ChartData): string {
   ].join("|");
 }
 
-function ensureShell(root: HTMLElement, model: ChartsModel, data: ChartData): void {
-  const fp = fingerprint(model, data);
-  if (root.dataset.chartFp === fp && root.querySelector(".charts-grid")) return;
+function moreIsOpen(root: HTMLElement): boolean {
+  return root.querySelector<HTMLDetailsElement>("#charts-more")?.open === true;
+}
 
+function ensureShell(
+  root: HTMLElement,
+  model: ChartsModel,
+  data: ChartData,
+  handlers?: ChartViewHandlers
+): void {
+  const fp = fingerprint(model, data);
+  if (root.dataset.chartFp === fp && root.querySelector(".charts-primary")) return;
+
+  const keepMoreOpen = moreIsOpen(root);
   for (const key of [...instances.keys()]) destroyChart(key);
+  resizeObserver?.disconnect();
   root.replaceChildren();
   root.dataset.chartFp = fp;
 
@@ -551,24 +614,41 @@ function ensureShell(root: HTMLElement, model: ChartsModel, data: ChartData): vo
     "chart-activity",
     `Event activity over the last ${days} days with a ${horizon}-day forecast band`
   );
-  const activity = chartPanel(
-    `Event activity · last ${days} days + ${horizon}d forecast`,
-    `${INFORMS.activity} ${INFORMS.forecast}`,
-    "chart-canvas-wrap",
-    activityCanvas
+  const activity = el("section", "chart-panel chart-panel--wide");
+  activity.id = "chart-activity-panel";
+  const activityHead = el("div", "chart-panel__head");
+  activityHead.append(panelTitle(`Event activity · last ${days} days + ${horizon}d forecast`));
+  const horizonRow = el("div", "chip-row chart-panel__horizon");
+  horizonRow.setAttribute("role", "radiogroup");
+  horizonRow.setAttribute("aria-label", "Forecast horizon");
+  for (const daysAhead of FORECAST_HORIZONS) {
+    const button = el("button", "chip chip--compact", `${daysAhead}-day band`);
+    button.type = "button";
+    button.dataset.forecast = String(daysAhead);
+    button.setAttribute("aria-pressed", model.view.forecast === daysAhead ? "true" : "false");
+    button.setAttribute("aria-checked", model.view.forecast === daysAhead ? "true" : "false");
+    if (model.view.forecast === daysAhead) button.classList.add("is-active");
+    button.addEventListener("click", () => handlers?.onForecast(daysAhead));
+    horizonRow.append(button);
+  }
+  activityHead.append(horizonRow);
+  const activityWrap = el("div", "chart-canvas-wrap");
+  activityWrap.append(activityCanvas);
+  const activityCaption = el("p", "chart-panel__caption chart-panel__caption--forecast");
+  activityCaption.id = "chart-forecast-caption";
+  activity.append(
+    activityHead,
+    el("p", "chart-panel__caption", CAPTIONS.activity),
+    activityWrap,
+    activityCaption
   );
-  const spikeNote = el("p", "chart-panel__caption");
-  spikeNote.id = "chart-spikes";
-  const forecastNote = el("p", "chart-panel__caption");
-  forecastNote.id = "chart-forecast-caption";
-  activity.append(spikeNote, forecastNote);
 
   const doughnutCanvas = makeCanvas("chart-channels", "Percentage of events by channel");
   const doughnut = chartPanel(
     "Events by channel",
-    INFORMS.doughnut,
     "chart-canvas-wrap chart-canvas-wrap--doughnut",
-    doughnutCanvas
+    doughnutCanvas,
+    { inform: INFORMS.doughnut }
   );
 
   const stackedCanvas = makeCanvas(
@@ -577,9 +657,9 @@ function ensureShell(root: HTMLElement, model: ChartsModel, data: ChartData): vo
   );
   const stacked = chartPanel(
     `Path mix over time · last ${days} days`,
-    INFORMS.stacked,
     "chart-canvas-wrap",
-    stackedCanvas
+    stackedCanvas,
+    { inform: INFORMS.stacked }
   );
   stacked.classList.add("chart-panel--wide");
 
@@ -589,9 +669,9 @@ function ensureShell(root: HTMLElement, model: ChartsModel, data: ChartData): vo
   );
   const split = chartPanel(
     "Automation resilience",
-    INFORMS.split,
     "chart-canvas-wrap chart-canvas-wrap--doughnut",
-    splitCanvas
+    splitCanvas,
+    { inform: INFORMS.split }
   );
   const meter = el("div", "resilience-meter");
   meter.id = "resilience-meter";
@@ -610,26 +690,27 @@ function ensureShell(root: HTMLElement, model: ChartsModel, data: ChartData): vo
   );
   const tags = chartPanel(
     "Stakeholder breakdown",
-    INFORMS.stakeholders,
     "chart-canvas-wrap",
-    tagsCanvas
+    tagsCanvas,
+    { inform: INFORMS.stakeholders }
   );
 
-  const compareCanvas = makeCanvas(
-    "chart-compare",
-    "Dual-path volume comparison"
-  );
-  const compare = chartPanel(
-    "Path compare",
-    INFORMS.compare,
-    "chart-canvas-wrap",
-    compareCanvas
-  );
-  compare.classList.add("chart-panel--wide");
+  const compareCanvas = makeCanvas("chart-compare", "Dual-path volume comparison");
+  const compare = el("section", "chart-panel chart-panel--wide");
   compare.id = "chart-compare-panel";
+  compare.append(
+    panelTitle(`Path compare · ${comparePairLabel(model.view.compare)}`),
+    el("p", "chart-panel__caption", CAPTIONS.compare)
+  );
+  const compareWrap = el("div", "chart-canvas-wrap");
+  compareWrap.append(compareCanvas);
+  const compareEmpty = el("p", "chart-empty");
+  compareEmpty.id = "chart-compare-empty";
+  compareEmpty.hidden = true;
+  compareEmpty.setAttribute("role", "status");
   const compareCaptionEl = el("p", "chart-panel__caption");
   compareCaptionEl.id = "chart-compare-caption";
-  compare.append(compareCaptionEl);
+  compare.append(compareWrap, compareEmpty, compareCaptionEl);
 
   const heat = el("section", "chart-panel chart-panel--wide");
   heat.append(panelTitle("Channel × weekday intensity"), informs(INFORMS.heat));
@@ -637,6 +718,8 @@ function ensureShell(root: HTMLElement, model: ChartsModel, data: ChartData): vo
   heatHost.id = "chart-heat";
   heat.append(heatHost);
 
+  const barsBlock = el("section", "chart-panel chart-panel--wide");
+  barsBlock.append(panelTitle("Per-path volume"), informs(INFORMS.bars));
   const bars = el("div", "chart-bars");
   bars.id = "chart-bars";
   for (const item of data.byChannel) {
@@ -648,28 +731,56 @@ function ensureShell(root: HTMLElement, model: ChartsModel, data: ChartData): vo
       "aria-label",
       `${item.label} event volume over the last ${days} days`
     );
-    panel.append(
-      panelTitle(`${item.label} · last ${days} days`),
-      informs(INFORMS.bars)
-    );
+    panel.append(panelTitle(`${item.label} · last ${days} days`));
     const wrap = el("div", "chart-canvas-wrap chart-canvas-wrap--bar");
     wrap.append(canvas);
     panel.append(wrap);
     bars.append(panel);
   }
+  barsBlock.append(bars);
 
   const tablePanel = el("section", "chart-panel chart-panel--wide");
-  tablePanel.append(panelTitle("Data view · top paths"), informs(INFORMS.table));
+  tablePanel.id = "chart-data-panel";
+  tablePanel.append(panelTitle("Path snapshot"), el("p", "chart-panel__caption", CAPTIONS.table));
   const tableHost = el("div", "data-view-host");
   tableHost.id = "chart-data-view";
   tablePanel.append(tableHost);
 
-  const topGrid = el("div", "charts-grid");
-  topGrid.append(activity, doughnut);
-  const midGrid = el("div", "charts-grid");
-  midGrid.append(split, tags);
+  const primary = el("div", "charts-primary");
+  primary.append(activity, compare, tablePanel);
 
-  root.append(meta, topGrid, stacked, midGrid, compare, heat, bars, tablePanel);
+  const more = el("details", "charts-more");
+  more.id = "charts-more";
+  const summary = el("summary", "charts-more__summary", "More views");
+  summary.title = "Stacked mix, resilience, stakeholders, weekday heat, and per-path bars";
+  const moreBody = el("div", "charts-more__body");
+  const mixGrid = el("div", "charts-grid");
+  mixGrid.append(doughnut, split);
+  moreBody.append(mixGrid, stacked, tags, heat, barsBlock);
+  more.append(summary, moreBody);
+  more.open = keepMoreOpen;
+  more.addEventListener("toggle", () => {
+    if (!lastRender) return;
+    const current = chartDataFromEvents(lastRender.model.events, lastRender.now, {
+      days: lastRender.model.view.range,
+      channel: lastRender.model.view.channel,
+      compare: lastRender.model.view.compare,
+      horizon: lastRender.model.view.forecast,
+    });
+    if (more.open) {
+      paintSecondary(root, current);
+      requestAnimationFrame(() => {
+        for (const key of SECONDARY_CHART_KEYS) instances.get(key)?.resize();
+        for (const [key, chart] of instances) {
+          if (key.startsWith("bar:")) chart.resize();
+        }
+      });
+    } else {
+      destroySecondaryCharts();
+    }
+  });
+
+  root.append(meta, primary, more);
 }
 
 function paintMeta(root: HTMLElement, model: ChartsModel, data: ChartData): void {
@@ -685,29 +796,18 @@ function paintMeta(root: HTMLElement, model: ChartsModel, data: ChartData): void
   meta.textContent = `${model.events.length} matching · ${data.inRangeCount} in last ${data.days} days · ${data.horizon}d forecast · ${channel} · ${lens}${q}${compare}`;
 }
 
-function paintSpikes(root: HTMLElement, spikes: SpikeDay[]): void {
-  const node = root.querySelector("#chart-spikes");
-  if (!node) return;
-  if (spikes.length === 0) {
-    node.textContent = `${INFORMS.spikes} None in this window.`;
-    return;
-  }
-  node.textContent = `${INFORMS.spikes} Spike days: ${spikes
-    .map((spike) => `${spike.label} (${spike.count})`)
-    .join(", ")}.`;
-}
-
-function paintForecastCaption(root: HTMLElement, data: ChartData): void {
+function paintActivityCaption(root: HTMLElement, data: ChartData): void {
   const node = root.querySelector("#chart-forecast-caption");
   if (!node) return;
   node.replaceChildren();
   const chip = el("span", "non-advisory__chip", "Not advice");
-  node.append(
-    chip,
-    document.createTextNode(
-      ` ${NON_ADVISORY} Band covers the next ${data.horizon} UTC days.`
-    )
-  );
+  chip.setAttribute("role", "note");
+  chip.title = NON_ADVISORY;
+  const spikes = spikeCaption(data.spikes);
+  const note = spikes
+    ? `${FORECAST_NOTE} Band covers the next ${data.horizon} UTC days. ${spikes}`
+    : `${FORECAST_NOTE} Band covers the next ${data.horizon} UTC days.`;
+  node.append(chip, document.createTextNode(` ${note}`));
 }
 
 function paintSplit(root: HTMLElement, data: ChartData): void {
@@ -724,18 +824,37 @@ function paintSplit(root: HTMLElement, data: ChartData): void {
 }
 
 function paintCompare(root: HTMLElement, data: ChartData): void {
-  const panel = root.querySelector<HTMLElement>("#chart-compare-panel");
   const caption = root.querySelector("#chart-compare-caption");
   const canvas = canvasOf(root, "#chart-compare");
-  if (!panel || !caption || !canvas) return;
-  const config = compareConfig(data);
-  if (!config || !data.compare) {
-    caption.textContent = "Select two paths above to compare who is drawing more signal right now.";
+  const wrap = canvas?.parentElement;
+  const empty = root.querySelector<HTMLElement>("#chart-compare-empty");
+  if (!caption || !canvas || !wrap || !empty) return;
+
+  const showEmpty = (message: string): void => {
     destroyChart("compare");
-    canvas.parentElement?.classList.add("is-muted");
+    wrap.hidden = true;
+    empty.hidden = false;
+    empty.textContent = message;
+    caption.textContent = "";
+  };
+
+  if (!data.compare) {
+    showEmpty("Select two paths above to compare.");
     return;
   }
-  canvas.parentElement?.classList.remove("is-muted");
+  if (compareIsEmpty(data.compare)) {
+    showEmpty(EMPTY_COMPARE);
+    return;
+  }
+
+  const config = compareConfig(data);
+  if (!config) {
+    showEmpty("Select two paths above to compare.");
+    return;
+  }
+  empty.hidden = true;
+  empty.textContent = "";
+  wrap.hidden = false;
   caption.textContent = compareCaption(data.compare);
   upsert("compare", canvas, config);
 }
@@ -794,6 +913,7 @@ function paintRanks(root: HTMLElement, ranks: ChannelRankRow[], days: number): v
   for (const label of ["Path", "Volume", "Share", "DoD", "WoW", "So what"]) {
     const th = el("th", undefined, label);
     th.scope = "col";
+    if (label === "DoD" || label === "WoW") th.className = "data-view__delta-col";
     head.append(th);
   }
   thead.append(head);
@@ -816,53 +936,29 @@ function paintRanks(root: HTMLElement, ranks: ChannelRankRow[], days: number): v
   host.append(table);
 }
 
-export function renderCharts(root: HTMLElement, model: ChartsModel, now = new Date()): void {
-  ensureRegistered();
-  if (model.loading) {
-    teardownCharts(root);
-    root.append(el("p", "empty", "Pulling the latest orbit…"));
-    return;
-  }
-  if (model.loadError) {
-    emptyState(root, "Could not load history", model.loadError, true);
-    return;
-  }
-  if (model.events.length === 0) {
-    emptyState(
-      root,
-      "No events match this filter",
-      "Try another channel, search, or audience lens. Charts use the same subset as Events, then apply the lens."
-    );
-    return;
-  }
-
-  const data = chartDataFromEvents(model.events, now, {
-    days: model.view.range,
-    channel: model.view.channel,
-    compare: model.view.compare,
-    horizon: model.view.forecast,
-  });
-  ensureShell(root, model, data);
-  paintMeta(root, model, data);
-  paintSpikes(root, data.spikes);
-  paintForecastCaption(root, data);
-  paintSplit(root, data);
-  paintHeat(root, data.heat);
-  paintRanks(root, data.ranks, data.days);
-
+function paintPrimary(root: HTMLElement, data: ChartData): void {
   const activityCanvas = canvasOf(root, "#chart-activity");
+  if (activityCanvas) {
+    upsert("line", activityCanvas, activityConfig(data.activity, data.forecast, data.spikes));
+  }
+  paintCompare(root, data);
+}
+
+function paintSecondary(root: HTMLElement, data: ChartData): void {
+  if (!moreIsOpen(root)) {
+    destroySecondaryCharts();
+    return;
+  }
   const doughnutCanvas = canvasOf(root, "#chart-channels");
   const stackedCanvas = canvasOf(root, "#chart-stacked");
   const splitCanvas = canvasOf(root, "#chart-split");
   const tagsCanvas = canvasOf(root, "#chart-stakeholders");
-  if (activityCanvas) {
-    upsert("line", activityCanvas, activityConfig(data.activity, data.forecast, data.spikes));
-  }
   if (doughnutCanvas) upsert("doughnut", doughnutCanvas, doughnutConfig(data));
   if (stackedCanvas) upsert("stacked", stackedCanvas, stackedConfig(data));
   if (splitCanvas) upsert("split", splitCanvas, splitConfig(data));
   if (tagsCanvas) upsert("tags", tagsCanvas, stakeholderConfig(data.stakeholders));
-  paintCompare(root, data);
+  paintSplit(root, data);
+  paintHeat(root, data.heat);
 
   const wantedBars = new Set(data.byChannel.map((series) => `bar:${series.channel}`));
   for (const key of [...instances.keys()]) {
@@ -875,4 +971,79 @@ export function renderCharts(root: HTMLElement, model: ChartsModel, now = new Da
     if (!canvas) continue;
     upsert(`bar:${series.channel}`, canvas, barConfig(series));
   }
+}
+
+function scheduleReflow(): void {
+  window.clearTimeout(resizeTimer);
+  resizeTimer = window.setTimeout(() => {
+    if (!lastRender) return;
+    const width = lastRender.root.clientWidth;
+    if (width < 16) return;
+    if (Math.abs(width - lastWidth) < 2 && instances.size > 0) {
+      for (const chart of instances.values()) chart.resize();
+      return;
+    }
+    lastWidth = width;
+    const { root, model, now } = lastRender;
+    const data = chartDataFromEvents(model.events, now, {
+      days: model.view.range,
+      channel: model.view.channel,
+      compare: model.view.compare,
+      horizon: model.view.forecast,
+    });
+    for (const key of [...instances.keys()]) destroyChart(key);
+    paintPrimary(root, data);
+    paintSecondary(root, data);
+  }, 160);
+}
+
+function observeRoot(root: HTMLElement): void {
+  if (resizeObserver) resizeObserver.disconnect();
+  resizeObserver = new ResizeObserver(() => scheduleReflow());
+  resizeObserver.observe(root);
+}
+
+export function renderCharts(
+  root: HTMLElement,
+  model: ChartsModel,
+  now = new Date(),
+  handlers?: ChartViewHandlers
+): void {
+  ensureRegistered();
+  lastRender = { root, model, now, handlers };
+  if (model.loading) {
+    teardownCharts(root);
+    lastRender = { root, model, now, handlers };
+    root.append(el("p", "empty", "Pulling the latest orbit…"));
+    return;
+  }
+  if (model.loadError) {
+    emptyState(root, "Could not load history", model.loadError, true);
+    lastRender = { root, model, now, handlers };
+    return;
+  }
+  if (model.events.length === 0) {
+    emptyState(
+      root,
+      "No events match this filter",
+      "Try another channel, search, or audience lens. Charts use the same subset as Events, then apply the lens."
+    );
+    lastRender = { root, model, now, handlers };
+    return;
+  }
+
+  const data = chartDataFromEvents(model.events, now, {
+    days: model.view.range,
+    channel: model.view.channel,
+    compare: model.view.compare,
+    horizon: model.view.forecast,
+  });
+  ensureShell(root, model, data, handlers);
+  paintMeta(root, model, data);
+  paintActivityCaption(root, data);
+  paintRanks(root, data.ranks, data.days);
+  paintPrimary(root, data);
+  paintSecondary(root, data);
+  lastWidth = root.clientWidth;
+  observeRoot(root);
 }
