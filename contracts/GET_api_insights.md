@@ -32,7 +32,7 @@ GET /api/insights
 }
 ```
 
-`detail` is always a string (empty when no analysis has been stored). `source` is one of: `synthetic` \| `manual` \| `bls` \| `onet` \| `scorecard` \| `apprenticeship_gov` \| `bls_ep` \| `unknown`. `source_url` / `fetched_at` are null unless the row was written by ingest. Reserved live sources are adapter-only. When demo is off, `synthetic` KPIs are omitted from this list. Order is **`updated_at DESC`**, then **`title ASC`**.
+`detail` is always a string (empty when no analysis has been stored). `source` is one of: `synthetic` \| `manual` \| `bls` \| `onet` \| `scorecard` \| `apprenticeship_gov` \| `bls_ep` \| `ipeds` \| `careeronestop` \| `census` \| `bea` \| `fred` \| `unknown`. `source_url` / `fetched_at` are null unless the row was written by ingest. Reserved live sources are adapter-only. When demo is off, `synthetic` KPIs are omitted from this list. Order is **`updated_at DESC`**, then **`title ASC`**.
 
 **500** persist failure (no leak of internals)
 

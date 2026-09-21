@@ -1,5 +1,12 @@
 /** Official keyless bulk feeds. Override with env when a release filename changes. */
 
+/**
+ * Phase A (keyless): scorecard zips, BLS OEWS tables, O*NET database CSV.
+ * apprenticeship.gov CSV is also keyless (Phase B in the source map; shipped early).
+ * Phase B CareerOneStop (token required): never persist Bing geocodes
+ * (Microsoft Bing ToS — no store/share). COS adapter is not in this worker.
+ */
+
 export const APPRENTICESHIP_CSV_URL =
   process.env.APPRENTICESHIP_CSV_URL ||
   "https://www.apprenticeship.gov/sites/default/files/wps/oa_partner_sponsors.csv";

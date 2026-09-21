@@ -1,5 +1,10 @@
 import { cell, parseCsv, parseNumber } from "../csv";
 
+/**
+ * College Scorecard bulk files. There is no national per-course price API —
+ * institution tuition / net price and CIP field-of-study debt/earnings only.
+ */
+
 export type ScorecardProvenance = {
   source: "scorecard";
   source_url: string;

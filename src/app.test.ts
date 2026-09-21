@@ -793,6 +793,11 @@ test("POST /api/events rejects reserved live sources", async () => {
       "scorecard",
       "apprenticeship_gov",
       "bls_ep",
+      "ipeds",
+      "careeronestop",
+      "census",
+      "bea",
+      "fred",
     ] as const) {
       const res = await app.inject({
         method: "POST",
@@ -828,6 +833,11 @@ test("POST /api/insight rejects reserved live sources", async () => {
       "scorecard",
       "apprenticeship_gov",
       "bls_ep",
+      "ipeds",
+      "careeronestop",
+      "census",
+      "bea",
+      "fred",
     ] as const) {
       const res = await app.inject({
         method: "POST",
@@ -1010,6 +1020,11 @@ test("GET /api/meta reports demo gate", async () => {
     assert.equal(body.allow_demo, true);
     assert.ok(body.live_sources.includes("scorecard"));
     assert.ok(body.live_sources.includes("apprenticeship_gov"));
+    assert.ok(body.live_sources.includes("ipeds"));
+    assert.ok(body.live_sources.includes("careeronestop"));
+    assert.ok(body.live_sources.includes("census"));
+    assert.ok(body.live_sources.includes("bea"));
+    assert.ok(body.live_sources.includes("fred"));
   });
   const app = createApp(memoryStore(), { allowDemo: false });
   await app.ready();

@@ -20,7 +20,7 @@ Public upsert for a market-insight KPI. Neutral path (no `hardcall`). Exact `tit
 | `title` | yes | string; trim; length 1–200 after trim; exact match is the upsert key |
 | `value` | yes | string; trim; length 1–500 after trim |
 | `detail` | no | string; trim; length 0–8000 after trim; omitted on **update** leaves the stored body unchanged |
-| `source` | no | **Anonymous public POST may send only:** `synthetic` \| `manual` \| `unknown` (no `playground` / `cli`). Omitted on **insert** stores `synthetic`. Omitted on **update** keeps the stored source. Seed scripts should send `synthetic`. Reserved live sources (`bls` \| `onet` \| `scorecard` \| `apprenticeship_gov` \| `bls_ep`) remain in the stored/GET enum for server-side ingest — **anonymous clients cannot set them** (400 `source` / `reserved`). When demo is off, synthetic (including omitted insert source) is **403** `demo_disabled`. |
+| `source` | no | **Anonymous public POST may send only:** `synthetic` \| `manual` \| `unknown` (no `playground` / `cli`). Omitted on **insert** stores `synthetic`. Omitted on **update** keeps the stored source. Seed scripts should send `synthetic`. Reserved live sources (`bls` \| `onet` \| `scorecard` \| `apprenticeship_gov` \| `bls_ep` \| `ipeds` \| `careeronestop` \| `census` \| `bea` \| `fred`) remain in the stored/GET enum for server-side ingest — **anonymous clients cannot set them** (400 `source` / `reserved`). When demo is off, synthetic (including omitted insert source) is **403** `demo_disabled`. |
 | `source_url` | no | omit or null; if present: `http(s)` URL |
 | `fetched_at` | no | omit or null; if present: ISO 8601 |
 

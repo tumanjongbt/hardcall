@@ -1,5 +1,7 @@
 /** POST /api/insight — boundary validation. Trust DB constraints after parse. */
 
+const { LIVE_SOURCES, LIVE_SOURCE_SET } = require("./live_sources");
+
 const ALLOWED_KEYS = new Set([
   "title",
   "value",
@@ -10,20 +12,11 @@ const ALLOWED_KEYS = new Set([
 ]);
 const DETAIL_MAX = 8000;
 
-/** Stored / GET enum. Live reserved values are adapter-only. */
-const INSIGHT_SOURCES = new Set([
-  "synthetic",
-  "manual",
-  "bls",
-  "onet",
-  "scorecard",
-  "apprenticeship_gov",
-  "bls_ep",
-  "unknown",
-]);
-
 /** Writable on anonymous POST /api/insight (no playground/cli). */
 const PUBLIC_INSIGHT_SOURCES = new Set(["synthetic", "manual", "unknown"]);
+
+/** Stored / GET enum. Live reserved values are adapter-only. */
+const INSIGHT_SOURCES = new Set([...PUBLIC_INSIGHT_SOURCES, ...LIVE_SOURCES]);
 
 const ISO_DATETIME =
   /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})?)?$/;
@@ -57,13 +50,7 @@ function parseFetchedAt(value) {
   return { ok: true, value: date.toISOString() };
 }
 
-const RESERVED_LIVE_SOURCES = new Set([
-  "bls",
-  "onet",
-  "scorecard",
-  "apprenticeship_gov",
-  "bls_ep",
-]);
+const RESERVED_LIVE_SOURCES = LIVE_SOURCE_SET;
 
 /**
  * @param {unknown} body

@@ -584,7 +584,7 @@ export function renderAttribution(
   const credit = el(
     "p",
     "site-footer__credit",
-    "Data: U.S. Department of Education College Scorecard · U.S. Bureau of Labor Statistics OEWS · O*NET Database by USDOL/ETA (CC BY 4.0; O*NET® is a trademark of USDOL/ETA) · U.S. Department of Labor registered apprenticeship partner sponsors."
+    "Data: U.S. Department of Education College Scorecard (institution / program cost of attendance, not per-course sticker) · U.S. Bureau of Labor Statistics OEWS · O*NET Database by USDOL/ETA (CC BY 4.0; O*NET® is a trademark of USDOL/ETA) · U.S. Department of Labor registered apprenticeship partner sponsors."
   );
   const mode = el(
     "p",

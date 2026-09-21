@@ -141,7 +141,7 @@ export function deriveFromInstitutions(rows: InstitutionRecord[]): DerivedBundle
       liveEvent(
         "university",
         `Median in-state tuition among ${countFmt(withTuition.length)} Title IV schools is ${usd(Math.round(mid))}`,
-        `College Scorecard most-recent institution file. Operating schools in this ingest: ${countFmt(rows.length)}. Median uses published TUITIONFEE_IN only — suppressed/NA values are omitted, not imputed. Cheapest in-sample: ${cheapest?.name ?? "n/a"} ${cheapest?.tuition_in_state != null ? usd(cheapest.tuition_in_state) : ""}. Highest in-sample: ${dearest?.name ?? "n/a"} ${dearest?.tuition_in_state != null ? usd(dearest.tuition_in_state) : ""}.`,
+        `College Scorecard most-recent institution file (institution / program cost of attendance, not per-course sticker). Operating schools in this ingest: ${countFmt(rows.length)}. Median uses published TUITIONFEE_IN only — suppressed/NA values are omitted, not imputed. Cheapest in-sample: ${cheapest?.name ?? "n/a"} ${cheapest?.tuition_in_state != null ? usd(cheapest.tuition_in_state) : ""}. Highest in-sample: ${dearest?.name ?? "n/a"} ${dearest?.tuition_in_state != null ? usd(dearest.tuition_in_state) : ""}.`,
         "scorecard",
         source_url,
         fetched_at,
@@ -166,7 +166,7 @@ export function deriveFromInstitutions(rows: InstitutionRecord[]): DerivedBundle
       liveInsight(
         "Median in-state tuition (operating Title IV)",
         usd(Math.round(mid)),
-        `Median of published in-state tuition (TUITIONFEE_IN) across ${countFmt(withTuition.length)} schools with a numeric value. This is program-level / institution sticker from Scorecard, not a per-section course catalog.`,
+        `Median of published in-state tuition (TUITIONFEE_IN) across ${countFmt(withTuition.length)} schools with a numeric value. Institution / program cost of attendance from College Scorecard — not a per-course catalog (no national per-section price API exists).`,
         "scorecard",
         source_url,
         fetched_at

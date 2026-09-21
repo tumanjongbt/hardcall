@@ -5,7 +5,7 @@ export const DECISION_LINE =
 
 /** Honest store footnote — charts follow whatever the API returned. */
 export const STORE_FOOTNOTE =
-  "Charts aggregate the event store. Live badges mark Scorecard, BLS, O*NET, and registered apprenticeship rows from server-side adapters.";
+  "Charts aggregate the event store. Live badges mark Scorecard, BLS, O*NET, and registered apprenticeship rows from server-side adapters. Scorecard costs are institution / program cost of attendance — not per-course sticker.";
 
 export const EMPTY_COMPARE = "No data for selected paths";
 
