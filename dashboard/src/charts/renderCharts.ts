@@ -20,6 +20,7 @@ import { CHANNEL_COLORS, CORONA, LINE, PAPER, PAPER_DIM, SIGNAL } from "./colors
 import {
   WINDOW_DAYS,
   chartDataFromEvents,
+  visibleChannelSlices,
   type ChannelSeries,
   type ChartData,
   type DayBucket,
@@ -130,6 +131,7 @@ function lineConfig(buckets: DayBucket[]): ChartConfiguration<"line"> {
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      animation: false,
       plugins: {
         legend: { display: false },
         tooltip: { mode: "index", intersect: false },
@@ -151,11 +153,11 @@ function lineConfig(buckets: DayBucket[]): ChartConfiguration<"line"> {
 }
 
 function doughnutConfig(data: ChartData): ChartConfiguration<"doughnut"> {
-  const slices = data.distribution.filter((slice) => slice.count > 0);
+  const slices = visibleChannelSlices(data.distribution);
   return {
     type: "doughnut",
     data: {
-      labels: slices.map((slice) => slice.label),
+      labels: slices.map((slice) => `${slice.label} (${formatPercent(slice.percent)})`),
       datasets: [
         {
           data: slices.map((slice) => slice.count),
@@ -168,6 +170,7 @@ function doughnutConfig(data: ChartData): ChartConfiguration<"doughnut"> {
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      animation: false,
       plugins: {
         legend: {
           position: "bottom",
@@ -206,6 +209,7 @@ function barConfig(series: ChannelSeries): ChartConfiguration<"bar"> {
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      animation: false,
       plugins: {
         legend: { display: false },
       },

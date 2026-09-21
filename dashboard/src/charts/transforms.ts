@@ -118,6 +118,10 @@ export function channelActivity(
   }));
 }
 
+export function visibleChannelSlices(slices: ChannelSlice[]): ChannelSlice[] {
+  return slices.filter((slice) => slice.count > 0);
+}
+
 export function chartDataFromEvents(
   events: EventRow[],
   now: Date = new Date(),

@@ -9,6 +9,7 @@ import {
   chartDataFromEvents,
   dailyActivity,
   lastDayKeys,
+  visibleChannelSlices,
 } from "./transforms";
 
 const now = new Date("2026-09-21T15:00:00.000Z");
@@ -96,7 +97,7 @@ test("charts recompute from the same channel + search subset as the feed", () =>
     data.activity.reduce((sum, bucket) => sum + bucket.count, 0),
     1
   );
-  const nonzero = data.distribution.filter((slice) => slice.count > 0);
+  const nonzero = visibleChannelSlices(data.distribution);
   assert.deepEqual(
     nonzero.map((slice) => slice.channel),
     ["trade"]
@@ -119,4 +120,13 @@ test("activeChannels is the channel filter, or all five when unfiltered", () => 
     "apprenticeship",
     "automation",
   ]);
+});
+
+test("visibleChannelSlices drops empty doughnut slices so percents stay on matching channels", () => {
+  const slices = channelDistribution(filterEvents(rows, "trade", ""));
+  assert.equal(slices.length, 5);
+  assert.deepEqual(
+    visibleChannelSlices(slices).map((slice) => [slice.channel, slice.percent]),
+    [["trade", 100]]
+  );
 });
