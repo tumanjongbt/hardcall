@@ -1,9 +1,19 @@
-import { isChannel } from "./channels";
-import type { DashboardTab, PerPage, ViewState } from "./types";
+import { isAudienceLens, isChannel } from "./channels";
+import type {
+  AudienceLens,
+  ChartRange,
+  DashboardTab,
+  ForecastHorizon,
+  PerPage,
+  ViewState,
+} from "./types";
 
 export const DEFAULT_PAGE = 1;
 export const DEFAULT_PER_PAGE: PerPage = 50;
 export const DEFAULT_TAB: DashboardTab = "events";
+export const DEFAULT_RANGE: ChartRange = 30;
+export const DEFAULT_FORECAST: ForecastHorizon = 14;
+export const DEFAULT_COMPARE = ["trade", "university"] as const;
 
 export function defaultViewState(): ViewState {
   return {
@@ -13,6 +23,10 @@ export function defaultViewState(): ViewState {
     channel: null,
     q: "",
     insight: null,
+    lens: null,
+    range: DEFAULT_RANGE,
+    forecast: DEFAULT_FORECAST,
+    compare: [...DEFAULT_COMPARE],
   };
 }
 
@@ -29,6 +43,54 @@ export function parsePerPage(value: string | null): PerPage {
   return 50;
 }
 
+export function parseRange(value: string | null): ChartRange {
+  if (value === "7" || value === "14" || value === "30" || value === "90") {
+    return Number(value) as ChartRange;
+  }
+  return DEFAULT_RANGE;
+}
+
+export function parseForecast(value: string | null): ForecastHorizon {
+  if (value === "14" || value === "30") return Number(value) as ForecastHorizon;
+  return DEFAULT_FORECAST;
+}
+
+/** Accepts `students` / `parents` / `counselors` / `workforce`, plus raw tag names. */
+export function parseLens(value: string | null): AudienceLens | null {
+  if (!value) return null;
+  const raw = value.trim().toLowerCase();
+  if (raw === "all" || raw === "") return null;
+  if (isAudienceLens(raw)) return raw;
+  if (raw === "high_school_students" || raw === "college_students") return "students";
+  if (raw === "career_counselors") return "counselors";
+  if (raw === "workforce_training_managers") return "workforce";
+  return null;
+}
+
+export function parseCompare(value: string | null): string[] {
+  if (value === null) return [...DEFAULT_COMPARE];
+  const trimmed = value.trim();
+  if (trimmed === "" || trimmed === "none") return [];
+  const seen = new Set<string>();
+  const channels: string[] = [];
+  for (const part of trimmed.split(",")) {
+    const channel = part.trim();
+    if (!isChannel(channel) || seen.has(channel)) continue;
+    seen.add(channel);
+    channels.push(channel);
+    if (channels.length === 2) break;
+  }
+  return channels;
+}
+
+function comparesAreDefault(compare: string[]): boolean {
+  return (
+    compare.length === DEFAULT_COMPARE.length &&
+    compare[0] === DEFAULT_COMPARE[0] &&
+    compare[1] === DEFAULT_COMPARE[1]
+  );
+}
+
 export function parseViewState(search: string): ViewState {
   const params = new URLSearchParams(
     search.startsWith("?") ? search.slice(1) : search
@@ -41,6 +103,7 @@ export function parseViewState(search: string): ViewState {
   const insightRaw = (params.get("insight") ?? "").trim();
   const insight = insightRaw.length > 0 ? insightRaw : null;
   const tab = insight ? "insights" : parseTab(params.get("tab"));
+  const lens = parseLens(params.get("lens") ?? params.get("stakeholder"));
   return {
     tab,
     page,
@@ -48,6 +111,10 @@ export function parseViewState(search: string): ViewState {
     channel,
     q: (params.get("q") ?? "").trim(),
     insight,
+    lens,
+    range: parseRange(params.get("range")),
+    forecast: parseForecast(params.get("forecast")),
+    compare: parseCompare(params.get("compare")),
   };
 }
 
@@ -61,6 +128,16 @@ export function serializeViewState(state: ViewState): string {
   if (q) params.set("q", q);
   if (state.tab === "insights" && state.insight) {
     params.set("insight", state.insight);
+  }
+  if (state.lens) params.set("lens", state.lens);
+  if (state.range && state.range !== DEFAULT_RANGE) params.set("range", String(state.range));
+  if (state.forecast && state.forecast !== DEFAULT_FORECAST) {
+    params.set("forecast", String(state.forecast));
+  }
+  if (state.compare.length === 0) {
+    params.set("compare", "none");
+  } else if (!comparesAreDefault(state.compare)) {
+    params.set("compare", state.compare.join(","));
   }
   return params.toString();
 }

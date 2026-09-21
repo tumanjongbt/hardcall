@@ -56,6 +56,10 @@ These query keys are written with `history.pushState` when a person changes filt
 | `channel` | omitted | `university` · `community_college` · `trade` · `apprenticeship` · `automation` |
 | `q` | omitted | search over title, description, tags (300ms debounce) |
 | `insight` | omitted | insight id; opens the analysis drawer on the Market Insights tab |
+| `lens` | omitted (`All`) | Charts audience lens: `students` · `parents` · `counselors` · `workforce` (`stakeholder=` is an alias; raw tags like `career_counselors` also parse) |
+| `range` | omitted (`30`) | Charts lookback: `7` · `14` · `30` · `90` (90-day history) |
+| `forecast` | omitted (`14`) | Charts forward band: `14` or `30` days |
+| `compare` | omitted (`trade,university`) | Two channels to compare, or `none` |
 
 Example: `/?page=2&perPage=50&channel=trade&q=welding` · `/?tab=charts` · `/?tab=insights` · `/?tab=insights&insight=<id>` · `/?tab=playground`
 
@@ -80,7 +84,17 @@ node cli/src/events.js push \
 
 The new card should slide/flash in at the top of page 1 when it matches the current filter.
 
-6. **Charts tab (reactive)** — open `?tab=charts` (or the Charts nav). You should see a 30-day activity line, a channel doughnut (University / Community College / Trade / Apprenticeship / Automation), and a bar chart per channel. Change a channel chip or type in search: after 300ms the charts recompute from **only** the matching events (same `channel` + `q` as Events). Switching back to Events keeps those filters.
+6. **Charts tab (counselor workflow)** — open `?tab=charts`. You should see:
+
+   - A mandatory **Not advice** chip (cannot be dismissed). The 14/30-day forecast band is telemetry, not a path recommendation.
+   - **Audience lens** (All / Students / Parents / Counselors / Workforce) — Students unions `high_school_students` + `college_students`. URL writes `lens=`.
+   - **Time range** 7 / 14 / 30 / **90** days (default 30). All time-series, the stacked mix, heat, ranks, and the forecast input recompute. URL writes `range=`.
+   - **Forecast horizon** 14- or 30-day band overlaid on the activity line. URL writes `forecast=`.
+   - **Path compare** — select two channels (default Trade vs University). Dual-series line answers “which path is drawing more signal right now?”
+   - Existing line / doughnut / per-channel bars, plus stacked composition, stakeholder bars, automation-resilience split, weekday heat, and a data view with volume, share, DoD/WoW, and a one-line **so what**.
+   - Change lens, range, channel, or search: after 300ms every chart **and** the data view update together. Share the URL.
+
+   Counselor recipe: set lens to **Students** (or **Parents**), range **30** (or **90** if you need the long hist), compare **Trade vs University**, and read the data-view “so what” before the family meeting. Treat automation resilience as a check on displacement risk, not a verdict.
 
 7. **Market Insights tab** — switch to Market Insights (`?tab=insights`). KPI cards should appear (empty until `POST /api/insight`). Click a card: the drawer shows title, KPI value, and `detail` (or “No analysis yet for this insight.”). Esc / Close returns to the grid. Reload `?tab=insights&insight=<id>` should reopen that tile. Wait ~15s or POST a new/updated title and confirm the grid refreshes on the next poll without closing an open drawer.
 

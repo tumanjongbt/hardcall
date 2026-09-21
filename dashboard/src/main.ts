@@ -28,12 +28,13 @@ import {
   renderStatus,
   renderTabs,
 } from "./render";
-import type { DashboardTab, EventRow, InsightRow, StreamStatus, ViewState } from "./types";
+import type { AudienceLens, ChartRange, DashboardTab, EventRow, ForecastHorizon, InsightRow, StreamStatus, ViewState } from "./types";
 import { hrefForState, parseViewState } from "./url-state";
 
 const tabsEl = must("#tabs");
 const eventsViewEl = must("#events-view");
 const chartsViewEl = must("#charts-view");
+const chartFiltersEl = must("#chart-filters");
 const chartsEl = must("#charts");
 const insightsViewEl = must("#insights-view");
 const eventFiltersEl = must("#event-filters");
@@ -83,6 +84,7 @@ function must<T extends HTMLElement = HTMLElement>(selector: string): T {
 
 function currentModel() {
   const filtered = filterEvents(allEvents, view.channel, view.q);
+  const chartFiltered = filterByLens(filtered, view.lens);
   const page = paginate(filtered, view.page, view.perPage);
   if (page.page !== view.page) {
     view = { ...view, page: page.page };
@@ -91,6 +93,7 @@ function currentModel() {
   return {
     events: page.items,
     filtered,
+    chartFiltered,
     freshIds,
     total: page.total,
     page: page.page,
@@ -129,8 +132,14 @@ function paint(): void {
   renderFeed(feedEl, model);
   renderPagination(paginationEl, model, setPage);
   if (model.view.tab === "charts") {
+    renderChartFilters(chartFiltersEl, model.view, {
+      onLens: setLens,
+      onRange: setRange,
+      onForecast: setForecast,
+      onToggleCompare: toggleCompare,
+    });
     renderCharts(chartsEl, {
-      events: model.filtered,
+      events: model.chartFiltered,
       view: model.view,
       loading: model.loading,
       loadError: model.loadError,
@@ -183,6 +192,34 @@ function closeInsight(): void {
 function setChannel(channel: string | null): void {
   if (view.channel === channel) return;
   pushView({ ...view, channel, page: 1 });
+}
+
+function setLens(lens: AudienceLens | null): void {
+  if (view.lens === lens) return;
+  pushView({ ...view, lens, page: 1 });
+}
+
+function setRange(range: ChartRange): void {
+  if (view.range === range) return;
+  pushView({ ...view, range });
+}
+
+function setForecast(forecast: ForecastHorizon): void {
+  if (view.forecast === forecast) return;
+  pushView({ ...view, forecast });
+}
+
+function toggleCompare(channel: string): void {
+  const selected = view.compare.filter((item) => item !== channel);
+  if (view.compare.includes(channel)) {
+    pushView({ ...view, compare: selected });
+    return;
+  }
+  if (view.compare.length >= 2) {
+    pushView({ ...view, compare: [view.compare[1] ?? channel, channel] });
+    return;
+  }
+  pushView({ ...view, compare: [...view.compare, channel] });
 }
 
 function setPerPage(perPage: ViewState["perPage"]): void {

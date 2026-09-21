@@ -34,7 +34,7 @@ body {
 }
 
 .sky {
-  width: min(1100px, calc(100% - 32px));
+  width: min(1180px, calc(100% - 32px));
   margin: 0 auto;
   padding: 36px 0 72px;
 }
@@ -574,12 +574,37 @@ body.has-insight-detail {
 }
 
 .chart-panel__title {
-  margin: 0 0 12px;
+  margin: 0 0 8px;
   font-family: "Avenir Next", "Segoe UI", sans-serif;
   font-size: 0.78rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--paper-dim);
+}
+
+.chart-panel__informs {
+  margin: 0 0 12px;
+  color: var(--paper-dim);
+  font-size: 0.92rem;
+}
+
+.chart-panel__informs strong {
+  color: var(--corona);
+  font-weight: 650;
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.chart-panel__caption {
+  margin: 12px 0 0;
+  color: var(--paper-dim);
+  font-size: 0.9rem;
+}
+
+.chart-panel--wide {
+  margin-bottom: 14px;
 }
 
 .chart-canvas-wrap {

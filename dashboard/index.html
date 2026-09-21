@@ -65,12 +65,16 @@
       </div>
 
       <div id="charts-view" hidden>
+        <section id="chart-filters" class="panel" aria-label="Chart decision filters"></section>
         <section id="charts" aria-label="Event charts"></section>
         <p class="footnote">
           Charts read the same loaded events as the feed (<code>GET /api/events</code>
-          plus live SSE). Open <code>?tab=charts</code>, then change channel chips or
-          search — after the 300ms debounce, every chart recalculates from only the
-          matching subset. Filters share <code>channel</code> and <code>q</code> with Events.
+          plus live SSE), then apply the audience lens. Open <code>?tab=charts</code>.
+          Channel chips and 300ms-debounced search still recompute every viz.
+          Lookback is <code>range=7|14|30|90</code> (default 30; 90 is history).
+          Forecast band is <code>forecast=14|30</code>. Lens is <code>lens=</code>
+          or <code>stakeholder=</code>. Path compare is <code>compare=trade,university</code>.
+          The <strong>Not advice</strong> chip is always on — the band is telemetry, not a recommendation.
         </p>
       </div>
 
