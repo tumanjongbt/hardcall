@@ -166,7 +166,7 @@ npm install
 npm run dev
 ```
 
-Default API base is `https://hardcall-api.onrender.com` (`VITE_EVENTS_API_URL`). After this branch is merged, Render must redeploy before production `GET /api/events` exists. Until then, point the dashboard at a local API:
+Default API base is `https://hardcall-api.onrender.com` (`VITE_EVENTS_API_URL` — origin only, public, baked into the Vite bundle). The API is CORS-open (`Access-Control-Allow-Origin: *`) so the dashboard origin can read history and post events. If history 404s, Render has not redeployed this API yet — point the dashboard at a local API:
 
 ```bash
 # repo root — in-memory store, no DATABASE_URL
@@ -246,6 +246,13 @@ fly deploy
 `Dockerfile` is a multi-stage Node 22 image (`npm start` equivalent: `node dist/server.js`). Set `PORT` to the platform’s listen port if it is not 3000.
 
 After deploy, `GET https://<host>/health` should return `{ "ok": true }`. Then POST a fixture event and confirm the row in Neon or Supabase.
+
+## Dashboard production notes
+
+See `dashboard/README.md` for the full checklist. Short version:
+
+- Celestial brand lives in the dashboard only (tokens, Unbounded / DM Sans / IBM Plex Mono, `public/logo.png`, `public/banner-celestial.png`). Keep `hardcall` out of routes, DDL, and status enums.
+- **Render free** does not run `npm run migrate` on deploy. Paste new `migrations/*.sql` in Supabase and record the stem in `schema_migrations`, then redeploy the web service. Paid Render / Railway / Fly can use the release command.
 
 ## Out of scope (later)
 

@@ -19,6 +19,7 @@ export function parseInsightsPayload(body: unknown): InsightRow[] {
   });
 }
 
+/** History list. `base` is the configured origin from `apiBase()` — never a secret. */
 export async function fetchEvents(base = apiBase()): Promise<EventRow[]> {
   const url = `${base}/api/events?limit=${LIST_FETCH_LIMIT}`;
   const res = await fetch(url);

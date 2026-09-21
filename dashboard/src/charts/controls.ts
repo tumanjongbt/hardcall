@@ -35,11 +35,16 @@ function chip(
   pressed: boolean,
   onClick: () => void,
   extraClass = "",
-  options: { disabled?: boolean; title?: string } = {}
+  options: { disabled?: boolean; title?: string; radio?: boolean } = {}
 ): HTMLButtonElement {
   const button = el("button", `chip chip--compact ${extraClass}`.trim(), label);
   button.type = "button";
-  button.setAttribute("aria-pressed", pressed ? "true" : "false");
+  if (options.radio) {
+    button.setAttribute("role", "radio");
+    button.setAttribute("aria-checked", pressed ? "true" : "false");
+  } else {
+    button.setAttribute("aria-pressed", pressed ? "true" : "false");
+  }
   if (pressed) button.classList.add("is-active");
   if (options.disabled) {
     button.disabled = true;
@@ -65,13 +70,19 @@ export function renderChartFilters(
   const lensRow = el("div", "chip-row");
   lensRow.setAttribute("role", "radiogroup");
   lensRow.setAttribute("aria-labelledby", "lens-label");
-  const allLens = chip("All", view.lens === null, () => handlers.onLens(null));
-  allLens.setAttribute("aria-checked", view.lens === null ? "true" : "false");
+  const allLens = chip("All", view.lens === null, () => handlers.onLens(null), "", {
+    radio: true,
+  });
   lensRow.append(allLens);
   for (const lens of AUDIENCE_LENSES) {
-    const button = chip(LENS_LABELS[lens], view.lens === lens, () => handlers.onLens(lens));
+    const button = chip(
+      LENS_LABELS[lens],
+      view.lens === lens,
+      () => handlers.onLens(lens),
+      "",
+      { radio: true }
+    );
     button.dataset.lens = lens;
-    button.setAttribute("aria-checked", view.lens === lens ? "true" : "false");
     lensRow.append(button);
   }
   lensField.append(lensLegend, lensRow);
@@ -87,9 +98,14 @@ export function renderChartFilters(
   rangeRow.setAttribute("role", "radiogroup");
   rangeRow.setAttribute("aria-labelledby", "range-label");
   for (const days of RANGE_PRESETS) {
-    const button = chip(`${days} days`, view.range === days, () => handlers.onRange(days));
+    const button = chip(
+      `${days} days`,
+      view.range === days,
+      () => handlers.onRange(days),
+      "",
+      { radio: true }
+    );
     button.dataset.range = String(days);
-    button.setAttribute("aria-checked", view.range === days ? "true" : "false");
     rangeRow.append(button);
   }
   rangeField.append(rangeLegend, rangeRow);

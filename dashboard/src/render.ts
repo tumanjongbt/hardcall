@@ -26,6 +26,31 @@ function el<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
+/** Shared loading / empty / error box so Events, Insights, and Charts match. */
+export function statusBox(
+  kind: "loading" | "error" | "empty",
+  body: string,
+  title?: string
+): HTMLElement {
+  if (kind === "loading") {
+    const node = el("p", "empty empty--loading", body);
+    node.setAttribute("role", "status");
+    return node;
+  }
+  if (kind === "error") {
+    const box = el("div", "empty empty--error");
+    box.setAttribute("role", "alert");
+    box.append(el("p", "empty__title", title ?? "Could not load"));
+    box.append(el("p", undefined, body));
+    return box;
+  }
+  if (!title) return el("p", "empty", body);
+  const box = el("div", "empty");
+  box.append(el("p", "empty__title", title));
+  box.append(el("p", undefined, body));
+  return box;
+}
+
 export function formatWhen(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
@@ -88,6 +113,7 @@ export function renderStatus(root: HTMLElement, status: StreamStatus): void {
   const dot = el("span", "live-pill__dot");
   const label =
     status === "live" ? "Live" : status === "connecting" ? "Connecting" : "Stream down";
+  pill.setAttribute("aria-label", `Stream ${label.toLowerCase()}`);
   pill.append(dot, el("span", undefined, label));
   root.append(pill);
 }
@@ -108,19 +134,16 @@ export function renderMeta(
 export function renderFeed(root: HTMLElement, model: FeedModel): void {
   root.replaceChildren();
   if (model.loading) {
-    root.append(el("p", "empty", "Pulling the latest orbit…"));
+    root.append(statusBox("loading", "Pulling the latest orbit…"));
     return;
   }
   if (model.loadError) {
-    const box = el("div", "empty empty--error");
-    box.append(el("p", "empty__title", "Could not load history"));
-    box.append(el("p", undefined, model.loadError));
-    root.append(box);
+    root.append(statusBox("error", model.loadError, "Could not load history"));
     return;
   }
   if (model.events.length === 0) {
     root.append(
-      el("p", "empty", "No events match this filter. Try another channel or search.")
+      statusBox("empty", "No events match this filter. Try another channel or search.")
     );
     return;
   }
@@ -175,6 +198,7 @@ export function renderTabs(
   onTab: (tab: DashboardTab) => void
 ): void {
   root.replaceChildren();
+  root.setAttribute("role", "tablist");
   const options: Array<{ value: DashboardTab; label: string }> = [
     { value: "events", label: "Events" },
     { value: "charts", label: "Charts" },
@@ -182,11 +206,16 @@ export function renderTabs(
     { value: "playground", label: "Playground" },
   ];
   for (const option of options) {
+    const selected = tab === option.value;
     const button = el("button", "tab", option.label);
     button.type = "button";
+    button.id = `tab-${option.value}`;
     button.dataset.tab = option.value;
-    button.setAttribute("aria-pressed", tab === option.value ? "true" : "false");
-    if (tab === option.value) button.classList.add("is-active");
+    button.setAttribute("role", "tab");
+    button.setAttribute("aria-selected", selected ? "true" : "false");
+    button.setAttribute("aria-controls", `${option.value}-view`);
+    button.tabIndex = selected ? 0 : -1;
+    if (selected) button.classList.add("is-active");
     button.addEventListener("click", () => onTab(option.value));
     root.append(button);
   }
@@ -199,19 +228,16 @@ export function renderInsights(
 ): void {
   root.replaceChildren();
   if (model.loading && model.insights.length === 0) {
-    root.append(el("p", "empty", "Pulling market signals…"));
+    root.append(statusBox("loading", "Pulling market signals…"));
     return;
   }
   if (model.loadError && model.insights.length === 0) {
-    const box = el("div", "empty empty--error");
-    box.append(el("p", "empty__title", "Could not load insights"));
-    box.append(el("p", undefined, model.loadError));
-    root.append(box);
+    root.append(statusBox("error", model.loadError, "Could not load insights"));
     return;
   }
   if (model.insights.length === 0) {
     root.append(
-      el("p", "empty", "No market insights yet. POST /api/insight to publish a KPI.")
+      statusBox("empty", "No market insights yet. POST /api/insight to publish a KPI.")
     );
     return;
   }
@@ -327,7 +353,9 @@ export function renderInsightsMeta(root: HTMLElement, model: InsightsModel): voi
   }
   const count = `${model.insights.length} KPI${model.insights.length === 1 ? "" : "s"}`;
   const refreshed = model.lastLoadedAt ? ` · refreshed ${formatWhen(model.lastLoadedAt)}` : "";
-  root.textContent = `${count}${refreshed}`;
+  const failed =
+    model.loadError && model.insights.length > 0 ? " · refresh failed" : "";
+  root.textContent = `${count}${refreshed}${failed}`;
 }
 
 export function renderPagination(
@@ -345,11 +373,13 @@ export function renderPagination(
   const prev = el("button", "chip chip--compact", "Previous");
   prev.type = "button";
   prev.disabled = model.page <= 1;
+  prev.setAttribute("aria-label", "Previous page");
   prev.addEventListener("click", () => onPage(model.page - 1));
 
   const next = el("button", "chip chip--compact", "Next");
   next.type = "button";
   next.disabled = model.page >= model.pageCount;
+  next.setAttribute("aria-label", "Next page");
   next.addEventListener("click", () => onPage(model.page + 1));
 
   const label = el(
