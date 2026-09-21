@@ -1,21 +1,28 @@
 {
-  "events": [
-    {
-      "channel": "trade",
-      "title": "Welding night cohort fills",
-      "description": "Evening seats gone in 48 hours.",
-      "emoji": "🔧",
-      "tags": ["high_school_students"],
-      "minutes_ago": 120,
-      "source": "synthetic"
-    }
-  ],
+  "project": { "name": "Hardcall" },
   "insights": [
     {
-      "title": "Trade night-cohort fill",
-      "value": "48h",
-      "detail": "Welding evenings are filling in two days. Keep a waitlist.",
-      "source": "synthetic"
+      "title": "Top Trade Income Growth",
+      "value": "+18%",
+      "icon": "📈"
+    }
+  ],
+  "events": [
+    {
+      "channel": "growing-jobs",
+      "title": "Electrician overtime is spiking",
+      "description": "Night call-outs across the valley. Licensed helpers still hired.",
+      "icon": "🔧",
+      "tags": ["High School Students", "Apprenticeships"],
+      "minutes_ago": 120
+    },
+    {
+      "channel": "ai-impact-alerts",
+      "title": "Routine claims coding is automating faster",
+      "description": "Entry billing roles shrinking; exception handling still hires.",
+      "icon": "🤖",
+      "tags": ["College Students", "Career Counselors"],
+      "minutes_ago": 45
     }
   ]
 }

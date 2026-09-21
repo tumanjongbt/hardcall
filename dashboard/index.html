@@ -302,10 +302,11 @@
           <section class="panel" aria-labelledby="admin-drop-title">
             <h2 id="admin-drop-title" class="panel-title">Data seed</h2>
             <p class="panel-lede">
-              Drop or choose a <code>.json</code> file. Expected shape:
-              <code>{"events":[{"channel":"trade","title":"…","minutes_ago":120}],"insights":[{"title":"…","value":"…"}]}</code>.
-              <code>minutes_ago</code> becomes <code>created_at</code> and is stripped before
-              POST. Default <code>source</code> is <code>synthetic</code>.
+              Drop Bernard’s seed JSON (not API enums). Channels like
+              <code>growing-jobs</code> / <code>ai-impact-alerts</code> and tags like
+              <code>High School Students</code> are mapped in the browser.
+              <code>icon</code> becomes <code>emoji</code>; <code>minutes_ago</code> becomes
+              <code>created_at</code>; <code>source</code> is always <code>synthetic</code>.
               Example: <a href="/seed-example.json">seed-example.json</a>.
             </p>
             <div id="admin-drop" class="dropzone">
