@@ -12,6 +12,12 @@ import {
   normalizeChannel,
   type PlaygroundForm,
 } from "./playground";
+import {
+  EMOJI_PRESETS,
+  cycleSample,
+  resetPlaygroundForm,
+  sampleStatusLabel,
+} from "./playgroundSamples";
 import { filterByLens, filterEvents, paginate } from "./query";
 import {
   renderChannels,
@@ -25,6 +31,7 @@ import {
   renderPerPage,
   renderPlaygroundError,
   renderPlaygroundMeta,
+  renderPlaygroundSampleStatus,
   renderPlaygroundToast,
   renderStatus,
   renderTabs,
@@ -61,6 +68,11 @@ const playgroundChannelEl = must<HTMLSelectElement>("#playground-channel");
 const playgroundTitleEl = must<HTMLInputElement>("#playground-title");
 const playgroundDescriptionEl = must<HTMLTextAreaElement>("#playground-description");
 const playgroundEmojiEl = must<HTMLInputElement>("#playground-emoji");
+const playgroundEmojiChipsEl = must("#playground-emoji-chips");
+const playgroundFillSampleEl = must<HTMLButtonElement>("#playground-fill-sample");
+const playgroundResetEl = must<HTMLButtonElement>("#playground-reset");
+const playgroundCopyEl = must<HTMLButtonElement>("#playground-copy");
+const playgroundSampleStatusEl = must("#playground-sample-status");
 
 let allEvents: EventRow[] = [];
 let insights: InsightRow[] = [];
@@ -76,6 +88,8 @@ let playgroundSubmitting = false;
 let playgroundError: string | null = null;
 let playgroundToast: { id: string; title: string } | null = null;
 let playgroundToastTimer: number | null = null;
+let playgroundSampleIndex: number | null = null;
+let playgroundCopyTimer: number | null = null;
 
 function must<T extends HTMLElement = HTMLElement>(selector: string): T {
   const node = document.querySelector<T>(selector);
@@ -248,18 +262,95 @@ function readPlaygroundForm(): PlaygroundForm {
   };
 }
 
+function writePlaygroundForm(form: PlaygroundForm): void {
+  playgroundChannelEl.value = form.channel;
+  playgroundTitleEl.value = form.title;
+  playgroundDescriptionEl.value = form.description;
+  playgroundEmojiEl.value = form.emoji;
+  for (const input of playgroundFormEl.querySelectorAll<HTMLInputElement>(
+    'input[name="tags"]'
+  )) {
+    input.checked = isStakeholderTag(input.value) && form.tags.includes(input.value);
+  }
+}
+
+function currentFetchSource(): string {
+  return fetchSnippet(apiBase(), buildEventPayload(readPlaygroundForm()));
+}
+
+function paintEmojiChipState(): void {
+  const current = playgroundEmojiEl.value.trim();
+  for (const button of playgroundEmojiChipsEl.querySelectorAll<HTMLButtonElement>(
+    "[data-emoji]"
+  )) {
+    const active = button.dataset.emoji === current;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-pressed", active ? "true" : "false");
+  }
+}
+
+function mountEmojiChips(): void {
+  playgroundEmojiChipsEl.replaceChildren();
+  for (const emoji of EMOJI_PRESETS) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "chip chip--emoji";
+    button.textContent = emoji;
+    button.dataset.emoji = emoji;
+    button.setAttribute("aria-label", `Use icon ${emoji}`);
+    button.addEventListener("click", () => {
+      playgroundEmojiEl.value = emoji;
+      paintPlayground();
+    });
+    playgroundEmojiChipsEl.append(button);
+  }
+}
+
 function paintPlayground(): void {
   const origin = apiBase();
   renderPlaygroundMeta(playgroundMetaEl, origin);
-  renderFetchPreview(
-    playgroundFetchEl,
-    fetchSnippet(origin, buildEventPayload(readPlaygroundForm()))
+  renderPlaygroundSampleStatus(
+    playgroundSampleStatusEl,
+    sampleStatusLabel(playgroundSampleIndex)
   );
+  renderFetchPreview(playgroundFetchEl, currentFetchSource());
   renderPlaygroundError(playgroundErrorEl, playgroundError);
   renderPlaygroundToast(playgroundToastEl, playgroundToast, dismissPlaygroundToast);
+  paintEmojiChipState();
   playgroundSubmitEl.disabled = playgroundSubmitting;
   playgroundSubmitEl.setAttribute("aria-busy", playgroundSubmitting ? "true" : "false");
-  playgroundSubmitEl.textContent = playgroundSubmitting ? "Submitting…" : "Submit event";
+  playgroundSubmitEl.textContent = playgroundSubmitting ? "Submitting…" : "Submit to API";
+}
+
+function fillPlaygroundSample(): void {
+  const next = cycleSample(playgroundSampleIndex);
+  playgroundSampleIndex = next.index;
+  writePlaygroundForm(next.form);
+  playgroundError = null;
+  paintPlayground();
+}
+
+function resetPlayground(): void {
+  playgroundSampleIndex = null;
+  writePlaygroundForm(resetPlaygroundForm());
+  playgroundError = null;
+  dismissPlaygroundToast();
+  paintPlayground();
+}
+
+async function copyFetchSnippet(): Promise<void> {
+  const source = currentFetchSource();
+  try {
+    await navigator.clipboard.writeText(source);
+    playgroundCopyEl.textContent = "Copied";
+  } catch {
+    playgroundCopyEl.textContent = "Copy failed";
+  }
+  if (playgroundCopyTimer !== null) window.clearTimeout(playgroundCopyTimer);
+  playgroundCopyTimer = window.setTimeout(() => {
+    playgroundCopyEl.textContent = "Copy";
+    playgroundCopyTimer = null;
+  }, 1600);
 }
 
 function dismissPlaygroundToast(): void {
@@ -282,24 +373,32 @@ function showPlaygroundToast(summary: { id: string; title: string }): void {
 
 playgroundFormEl.addEventListener("input", () => {
   if (view.tab === "playground") {
-    renderFetchPreview(
-      playgroundFetchEl,
-      fetchSnippet(apiBase(), buildEventPayload(readPlaygroundForm()))
-    );
+    renderFetchPreview(playgroundFetchEl, currentFetchSource());
+    paintEmojiChipState();
   }
 });
 playgroundFormEl.addEventListener("change", () => {
   if (view.tab === "playground") {
-    renderFetchPreview(
-      playgroundFetchEl,
-      fetchSnippet(apiBase(), buildEventPayload(readPlaygroundForm()))
-    );
+    renderFetchPreview(playgroundFetchEl, currentFetchSource());
+    paintEmojiChipState();
   }
 });
 
 playgroundFormEl.addEventListener("submit", (event) => {
   event.preventDefault();
   void submitPlayground();
+});
+
+playgroundFillSampleEl.addEventListener("click", () => {
+  fillPlaygroundSample();
+});
+
+playgroundResetEl.addEventListener("click", () => {
+  resetPlayground();
+});
+
+playgroundCopyEl.addEventListener("click", () => {
+  void copyFetchSnippet();
 });
 
 async function submitPlayground(): Promise<void> {
@@ -409,6 +508,8 @@ async function loadInsights(): Promise<void> {
 
 searchEl.value = view.q;
 history.replaceState(view, "", hrefForState(view, location.pathname));
+mountEmojiChips();
+writePlaygroundForm(resetPlaygroundForm());
 paint();
 void loadHistory();
 void loadInsights();

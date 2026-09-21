@@ -631,10 +631,44 @@ body.has-insight-detail {
   color: var(--paper);
 }
 
+.panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.panel-head .panel-title {
+  margin: 0;
+}
+
+.panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.sample-status {
+  margin: 0 0 10px;
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+  color: var(--signal);
+}
+
 .panel-lede {
   margin: 0 0 18px;
   color: var(--paper-dim);
   font-size: 0.95rem;
+}
+
+.panel-lede code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.88em;
+  color: var(--signal);
 }
 
 .playground-layout {
@@ -691,6 +725,12 @@ select.field {
   margin-bottom: 6px;
 }
 
+.tag-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .check {
   display: flex;
   align-items: center;
@@ -706,19 +746,57 @@ select.field {
   height: 16px;
 }
 
+.check--chip {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 7px 12px;
+  background: color-mix(in srgb, var(--void) 40%, transparent);
+  gap: 8px;
+  font-size: 0.88rem;
+}
+
+.check--chip:has(input:checked) {
+  border-color: var(--nebula);
+  background: color-mix(in srgb, var(--nebula) 40%, var(--void));
+}
+
+.chip-row--emoji {
+  margin: 0 0 10px;
+}
+
+.chip--emoji {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15rem;
+  border-radius: 12px;
+}
+
 .submit {
   appearance: none;
-  justify-self: start;
+  width: 100%;
+  justify-self: stretch;
   border: 1px solid var(--corona);
   background: color-mix(in srgb, var(--corona) 22%, var(--void));
   color: var(--paper);
   border-radius: 999px;
-  padding: 10px 20px;
+  padding: 12px 20px;
   font: inherit;
   font-family: "Avenir Next", "Segoe UI", sans-serif;
   font-size: 0.95rem;
   letter-spacing: 0.06em;
   cursor: pointer;
+}
+
+.form-hint {
+  margin: 8px 0 0;
+  text-align: center;
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-size: 0.82rem;
+  color: var(--paper-dim);
 }
 
 .submit:hover,
