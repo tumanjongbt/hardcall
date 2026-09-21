@@ -1,5 +1,6 @@
 import { CHANNELS, CHANNEL_LABELS, channelLabel, tagLabel } from "./channels";
 import { insightDetailBody, insightTone } from "./insights";
+import { highlightFetchHtml } from "./playground";
 import type { DashboardTab, EventRow, InsightRow, StreamStatus, ViewState } from "./types";
 
 export type FeedModel = {
@@ -178,6 +179,7 @@ export function renderTabs(
     { value: "events", label: "Events" },
     { value: "charts", label: "Charts" },
     { value: "insights", label: "Market Insights" },
+    { value: "playground", label: "Playground" },
   ];
   for (const option of options) {
     const button = el("button", "tab", option.label);
@@ -357,4 +359,50 @@ export function renderPagination(
   );
 
   root.append(prev, label, next);
+}
+
+export function renderFetchPreview(root: HTMLElement, source: string): void {
+  root.innerHTML = highlightFetchHtml(source);
+}
+
+export function renderPlaygroundError(root: HTMLElement, message: string | null): void {
+  if (!message) {
+    root.hidden = true;
+    root.replaceChildren();
+    return;
+  }
+  root.hidden = false;
+  root.replaceChildren();
+  root.append(el("p", "banner__title", "Request failed"));
+  root.append(el("p", "banner__body", message));
+}
+
+export type PlaygroundToast = { id: string; title: string };
+
+export function renderPlaygroundToast(
+  root: HTMLElement,
+  toast: PlaygroundToast | null,
+  onDismiss: () => void
+): void {
+  if (!toast) {
+    root.hidden = true;
+    root.replaceChildren();
+    return;
+  }
+  root.hidden = false;
+  root.replaceChildren();
+  const card = el("div", "toast__card");
+  card.append(el("p", "toast__kicker", "Event posted"));
+  const heading = toast.title.trim() || "(untitled)";
+  card.append(el("p", "toast__title", heading));
+  card.append(el("p", "toast__id", `id ${toast.id}`));
+  const close = el("button", "toast__close", "Dismiss");
+  close.type = "button";
+  close.addEventListener("click", onDismiss);
+  card.append(close);
+  root.append(card);
+}
+
+export function renderPlaygroundMeta(root: HTMLElement, apiOrigin: string): void {
+  root.textContent = `POST ${apiOrigin.replace(/\/+$/, "")}/api/events`;
 }

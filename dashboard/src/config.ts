@@ -11,3 +11,4 @@ export function apiBase(
 export const SEARCH_DEBOUNCE_MS = 300;
 export const LIST_FETCH_LIMIT = 1000;
 export const INSIGHTS_POLL_MS = 15_000;
+export const PLAYGROUND_TOAST_MS = 6_000;

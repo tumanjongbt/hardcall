@@ -17,7 +17,7 @@ Phase 1 is the always-on ingest API and cloud Postgres store. Scrapers and data 
 | HTTP contracts | `contracts/POST_api_events.md`, `contracts/GET_api_events.md`, `contracts/GET_api_events_stream.md`, `contracts/POST_api_insight.md`, `contracts/GET_api_insights.md` |
 | TypeScript API | `src/app.ts`, `src/server.ts`, `src/sse_hub.ts` |
 | `events` CLI | `cli/` (own package; see `cli/README.md`) |
-| Dashboard | `dashboard/` (Vite; Events feed, Charts, Market Insights; see `dashboard/README.md`) |
+| Dashboard | `dashboard/` (Vite; Events, Charts, Market Insights, Playground ingest; see `dashboard/README.md`) |
 
 Table name is `events`. Schema identifiers stay product-neutral (no `hardcall` in DDL, routes, or error codes).
 
@@ -177,7 +177,7 @@ cd dashboard
 VITE_EVENTS_API_URL=http://127.0.0.1:3000 npm run dev
 ```
 
-The Events tab stays reverse-chronological, listens on SSE, filters by channel, debounces search by 300ms, paginates (50 / 100 / all), and writes `page`, `perPage`, `channel`, and `q` into the URL for bookmarking. The Charts tab (`?tab=charts`) aggregates that same filtered event store (line / doughnut / per-channel bars). The Market Insights tab polls `GET /api/insights` on mount and every **15 seconds** (`?tab=insights`). Click a KPI card to open that topic’s analysis (Esc or Close returns to the grid). Counselors can deep-link `?tab=insights&insight=<id>`.
+The Events tab stays reverse-chronological, listens on SSE, filters by channel, debounces search by 300ms, paginates (50 / 100 / all), and writes `page`, `perPage`, `channel`, and `q` into the URL for bookmarking. The Charts tab (`?tab=charts`) aggregates that same filtered event store (line / doughnut / per-channel bars). The Market Insights tab polls `GET /api/insights` on mount and every **15 seconds** (`?tab=insights`). Click a KPI card to open that topic’s analysis (Esc or Close returns to the grid). Counselors can deep-link `?tab=insights&insight=<id>`. The Playground tab (`?tab=playground`) is a mock-ingest panel: form → live `fetch()` preview → real `POST /api/events`. Bulk synthetic BLS/O*NET-style seed: `prompts/MOCK_INGESTION_SCRIPT_PROMPT.md` (pointer: `scripts/mock-ingest-from-prompt.md`).
 
 ### `events` CLI
 
