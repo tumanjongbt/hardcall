@@ -66,6 +66,37 @@ export async function postEvent(
   return parsed as EventRow;
 }
 
+export async function postInsight(
+  payload: unknown,
+  base = apiBase()
+): Promise<InsightRow> {
+  const res = await fetch(`${base}/api/insight`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const raw = await res.text();
+  let parsed: unknown = null;
+  if (raw) {
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      parsed = null;
+    }
+  }
+  if (res.status !== 200 && res.status !== 201) {
+    const error = new Error(formatApiError(res.status, parsed, raw)) as Error & {
+      status: number;
+    };
+    error.status = res.status;
+    throw error;
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error(`HTTP ${res.status}: invalid_insight_payload`);
+  }
+  return parsed as InsightRow;
+}
+
 export async function fetchInsights(base = apiBase()): Promise<InsightRow[]> {
   const res = await fetch(`${base}/api/insights`);
   if (!res.ok) {

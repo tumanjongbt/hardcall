@@ -86,7 +86,7 @@ function createMemoryStore(
       const row: EventRow = {
         id: crypto.randomUUID(),
         ...value,
-        created_at: new Date().toISOString(),
+        created_at: value.created_at ?? new Date().toISOString(),
         source: value.source,
         source_url: value.source_url,
         fetched_at: value.fetched_at,

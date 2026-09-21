@@ -232,6 +232,7 @@ export function renderTabs(
     { value: "charts", label: "Charts" },
     { value: "insights", label: "Market Insights" },
     { value: "playground", label: "Playground" },
+    { value: "admin", label: "Admin" },
   ];
   for (const option of options) {
     const selected = tab === option.value;
@@ -488,4 +489,60 @@ export function renderPlaygroundSampleStatus(
   }
   root.hidden = false;
   root.textContent = label;
+}
+
+export type AdminSeedStatus = {
+  running: boolean;
+  fileName: string | null;
+  total: number;
+  done: number;
+  current: string | null;
+  eventsOk: number;
+  insightsOk: number;
+  errors: string[];
+  success: string | null;
+  parseError: string | null;
+};
+
+export function renderAdminStatus(root: HTMLElement, status: AdminSeedStatus): void {
+  root.replaceChildren();
+  const box = el("div", "seed-status");
+  if (status.parseError) {
+    box.append(el("p", "banner__title", "Could not read file"));
+    box.append(el("p", "seed-status__line", status.parseError));
+    root.append(box);
+    return;
+  }
+  if (!status.running && !status.success && status.errors.length === 0 && !status.fileName) {
+    return;
+  }
+  if (status.fileName) {
+    box.append(el("p", "seed-status__line", `File: ${status.fileName}`));
+  }
+  if (status.total > 0) {
+    const counts = `${status.done}/${status.total} posted · ${status.eventsOk} events · ${status.insightsOk} insights`;
+    box.append(el("p", "seed-status__line", counts));
+    const meter = el("div", "resilience-meter");
+    meter.setAttribute("aria-hidden", "true");
+    const fill = el("div", "resilience-meter__fill");
+    const pct = Math.round((status.done / status.total) * 100);
+    fill.style.width = `${pct}%`;
+    meter.append(fill);
+    box.append(meter);
+  }
+  if (status.current) {
+    box.append(el("p", "seed-status__line", status.current));
+  }
+  if (status.success) {
+    box.append(el("p", "seed-status__success", status.success));
+  }
+  if (status.errors.length) {
+    box.append(el("p", "banner__title", `${status.errors.length} error${status.errors.length === 1 ? "" : "s"}`));
+    const list = el("ul", "seed-status__errors");
+    for (const error of status.errors) {
+      list.append(el("li", undefined, error));
+    }
+    box.append(list);
+  }
+  root.append(box);
 }

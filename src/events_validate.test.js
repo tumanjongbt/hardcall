@@ -66,5 +66,22 @@ fail(
   "fetched_at",
   "iso_datetime"
 );
+fail(
+  { channel: "university", title: "x", created_at: "yesterday" },
+  "created_at",
+  "iso_datetime"
+);
+assert.equal(
+  ok({
+    channel: "trade",
+    title: "x",
+    created_at: "2026-09-20T10:00:00.000Z",
+  }).created_at,
+  "2026-09-20T10:00:00.000Z"
+);
+assert.equal(
+  ok({ channel: "trade", title: "x" }).created_at,
+  undefined
+);
 
 console.log("events_validate: ok");

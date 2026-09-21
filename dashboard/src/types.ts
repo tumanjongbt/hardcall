@@ -34,7 +34,7 @@ export type InsightRow = {
   updated_at: string;
 };
 
-export type DashboardTab = "events" | "charts" | "insights" | "playground";
+export type DashboardTab = "events" | "charts" | "insights" | "playground" | "admin";
 
 export type PerPage = 50 | 100 | "all";
 

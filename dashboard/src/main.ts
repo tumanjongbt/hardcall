@@ -1,4 +1,4 @@
-import { fetchEvents, fetchInsights, postEvent, subscribeEvents } from "./api";
+import { fetchEvents, fetchInsights, postEvent, postInsight, subscribeEvents } from "./api";
 import { DECISION_LINE } from "./charts/copy";
 import { renderCharts, teardownCharts } from "./charts/renderCharts";
 import { renderChartFilters } from "./charts/controls";
@@ -38,7 +38,15 @@ import {
   renderPlaygroundToast,
   renderStatus,
   renderTabs,
+  renderAdminStatus,
 } from "./render";
+import {
+  emptySeedProgress,
+  ingestSeed,
+  isJsonFile,
+  parseSeedJson,
+  type SeedProgress,
+} from "./seed";
 import type { AudienceLens, ChartRange, DashboardTab, EventRow, ForecastHorizon, InsightRow, StreamStatus, ViewState } from "./types";
 import { hrefForState, parseViewState } from "./url-state";
 
@@ -79,6 +87,12 @@ const playgroundFillSampleEl = must<HTMLButtonElement>("#playground-fill-sample"
 const playgroundResetEl = must<HTMLButtonElement>("#playground-reset");
 const playgroundCopyEl = must<HTMLButtonElement>("#playground-copy");
 const playgroundSampleStatusEl = must("#playground-sample-status");
+const adminViewEl = must("#admin-view");
+const adminDropEl = must("#admin-drop");
+const adminFileEl = must<HTMLInputElement>("#admin-file");
+const adminChooseEl = must<HTMLButtonElement>("#admin-choose");
+const adminStatusEl = must("#admin-status");
+const adminToastEl = must("#admin-toast");
 
 let allEvents: EventRow[] = [];
 let insights: InsightRow[] = [];
@@ -96,6 +110,8 @@ let playgroundToast: { id: string; title: string } | null = null;
 let playgroundToastTimer: number | null = null;
 let playgroundSampleIndex: number | null = null;
 let playgroundCopyTimer: number | null = null;
+let seedProgress: SeedProgress = emptySeedProgress();
+let adminToastTimer: number | null = null;
 
 function must<T extends HTMLElement = HTMLElement>(selector: string): T {
   const node = document.querySelector<T>(selector);
@@ -149,8 +165,11 @@ function paint(): void {
   chartsDecisionEl.textContent = DECISION_LINE;
   insightsViewEl.hidden = model.view.tab !== "insights";
   playgroundViewEl.hidden = model.view.tab !== "playground";
+  adminViewEl.hidden = model.view.tab !== "admin";
   eventFiltersEl.hidden =
-    model.view.tab === "insights" || model.view.tab === "playground";
+    model.view.tab === "insights" ||
+    model.view.tab === "playground" ||
+    model.view.tab === "admin";
   eventsViewEl.setAttribute("aria-busy", model.loading ? "true" : "false");
   chartsEl.setAttribute("aria-busy", model.loading ? "true" : "false");
   insightsEl.setAttribute(
@@ -206,6 +225,7 @@ function paint(): void {
     closeInsight
   );
   if (model.view.tab === "playground") paintPlayground();
+  if (model.view.tab === "admin") paintAdmin();
   if (searchEl.value !== model.view.q && document.activeElement !== searchEl) {
     searchEl.value = model.view.q;
   }
@@ -435,6 +455,124 @@ playgroundResetEl.addEventListener("click", () => {
 
 playgroundCopyEl.addEventListener("click", () => {
   void copyFetchSnippet();
+});
+
+function paintAdmin(): void {
+  renderAdminStatus(adminStatusEl, seedProgress);
+  const running = seedProgress.running;
+  adminDropEl.classList.toggle("is-disabled", running);
+  adminDropEl.setAttribute("aria-disabled", running ? "true" : "false");
+  adminChooseEl.disabled = running;
+  adminFileEl.disabled = running;
+}
+
+function showAdminToast(message: string): void {
+  adminToastEl.hidden = false;
+  adminToastEl.replaceChildren();
+  const card = document.createElement("div");
+  card.className = "toast__card";
+  const kicker = document.createElement("p");
+  kicker.className = "toast__kicker";
+  kicker.textContent = "Seed complete";
+  const title = document.createElement("p");
+  title.className = "toast__title";
+  title.textContent = message;
+  card.append(kicker, title);
+  adminToastEl.append(card);
+  if (adminToastTimer !== null) window.clearTimeout(adminToastTimer);
+  adminToastTimer = window.setTimeout(() => {
+    adminToastEl.hidden = true;
+    adminToastEl.replaceChildren();
+    adminToastTimer = null;
+  }, PLAYGROUND_TOAST_MS);
+}
+
+async function ingestJsonFile(file: File): Promise<void> {
+  if (seedProgress.running) return;
+  if (!isJsonFile(file)) {
+    seedProgress = {
+      ...emptySeedProgress(),
+      fileName: file.name,
+      parseError: "Only .json files are accepted.",
+    };
+    paintAdmin();
+    return;
+  }
+  let text: string;
+  try {
+    text = await file.text();
+  } catch {
+    seedProgress = {
+      ...emptySeedProgress(),
+      fileName: file.name,
+      parseError: "Could not read that file.",
+    };
+    paintAdmin();
+    return;
+  }
+  const parsed = parseSeedJson(text);
+  if (!parsed.ok) {
+    seedProgress = {
+      ...emptySeedProgress(),
+      fileName: file.name,
+      parseError: parsed.error,
+    };
+    paintAdmin();
+    return;
+  }
+  seedProgress = {
+    ...emptySeedProgress(),
+    running: true,
+    fileName: file.name,
+    total: parsed.value.events.length + parsed.value.insights.length,
+  };
+  paintAdmin();
+  const result = await ingestSeed(parsed.value, {
+    postEvent,
+    postInsight,
+    onProgress(patch) {
+      seedProgress = { ...seedProgress, ...patch };
+      paintAdmin();
+    },
+  });
+  if (result.eventsOk > 0 || result.insightsOk > 0) {
+    await loadHistory();
+    await loadInsights();
+  }
+  if (result.errors.length === 0 && seedProgress.success) {
+    showAdminToast(seedProgress.success);
+  }
+  paintAdmin();
+}
+
+adminChooseEl.addEventListener("click", () => {
+  if (seedProgress.running) return;
+  adminFileEl.click();
+});
+
+adminFileEl.addEventListener("change", () => {
+  const file = adminFileEl.files?.[0];
+  adminFileEl.value = "";
+  if (file) void ingestJsonFile(file);
+});
+
+adminDropEl.addEventListener("dragenter", (event) => {
+  event.preventDefault();
+  if (!seedProgress.running) adminDropEl.classList.add("is-over");
+});
+adminDropEl.addEventListener("dragover", (event) => {
+  event.preventDefault();
+  if (!seedProgress.running) adminDropEl.classList.add("is-over");
+});
+adminDropEl.addEventListener("dragleave", () => {
+  adminDropEl.classList.remove("is-over");
+});
+adminDropEl.addEventListener("drop", (event) => {
+  event.preventDefault();
+  adminDropEl.classList.remove("is-over");
+  if (seedProgress.running) return;
+  const file = event.dataTransfer?.files?.[0];
+  if (file) void ingestJsonFile(file);
 });
 
 async function submitPlayground(): Promise<void> {

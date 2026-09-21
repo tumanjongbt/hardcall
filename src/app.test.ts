@@ -24,7 +24,7 @@ function memoryStore(
       const row: EventRow = {
         id: "550e8400-e29b-41d4-a716-446655440000",
         ...value,
-        created_at: "2026-09-20T23:56:00.000Z",
+        created_at: value.created_at ?? "2026-09-20T23:56:00.000Z",
         source: value.source,
         source_url: value.source_url,
         fetched_at: value.fetched_at,
@@ -361,6 +361,11 @@ test("POST /api/events validation failures", async () => {
       {
         payload: { channel: "university", title: "x", fetched_at: "yesterday" },
         field: "fetched_at",
+        rule: "iso_datetime",
+      },
+      {
+        payload: { channel: "university", title: "x", created_at: "yesterday" },
+        field: "created_at",
         rule: "iso_datetime",
       },
     ];
@@ -843,6 +848,38 @@ test("POST /api/events accepts playground provenance", async () => {
       assert.equal(body.source_url, "https://example.com/playground");
       assert.equal(body.fetched_at, "2026-09-21T08:30:00.000Z");
       assert.equal(stored?.source, "playground");
+    }
+  );
+});
+
+test("POST /api/events uses client created_at when valid", async () => {
+  let stored: CreateEvent | undefined;
+  await withApp(
+    memoryStore((value) => {
+      stored = value;
+      return {
+        id: "550e8400-e29b-41d4-a716-446655440000",
+        ...value,
+        created_at: value.created_at ?? "2026-09-20T23:56:00.000Z",
+      };
+    }),
+    async (app) => {
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/events",
+        headers: { "content-type": "application/json" },
+        payload: {
+          channel: "trade",
+          title: "Backdated HVAC demand",
+          source: "synthetic",
+          created_at: "2026-09-20T10:00:00.000Z",
+        },
+      });
+      assert.equal(res.statusCode, 201);
+      const body = res.json() as EventRow;
+      assert.equal(body.created_at, "2026-09-20T10:00:00.000Z");
+      assert.equal(stored?.created_at, "2026-09-20T10:00:00.000Z");
+      assert.equal(stored?.source, "synthetic");
     }
   );
 });

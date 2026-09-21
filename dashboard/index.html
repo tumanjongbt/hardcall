@@ -285,6 +285,50 @@
             Posts to the configured API origin only. No secrets ship in this page.
           </p>
         </section>
+
+        <section
+          id="admin-view"
+          role="tabpanel"
+          aria-labelledby="tab-admin"
+          hidden
+        >
+          <header class="charts-heading">
+            <h1 class="charts-heading__title">Admin</h1>
+            <p class="charts-heading__decision">
+              Seed synthetic career trends from a JSON file. Parsed in this browser,
+              then posted one-by-one.
+            </p>
+          </header>
+          <section class="panel" aria-labelledby="admin-drop-title">
+            <h2 id="admin-drop-title" class="panel-title">Data seed</h2>
+            <p class="panel-lede">
+              Drop or choose a <code>.json</code> file. Expected shape:
+              <code>{"events":[{"channel":"trade","title":"…","minutes_ago":120}],"insights":[{"title":"…","value":"…"}]}</code>.
+              <code>minutes_ago</code> becomes <code>created_at</code> and is stripped before
+              POST. Default <code>source</code> is <code>synthetic</code>.
+              Example: <a href="/seed-example.json">seed-example.json</a>.
+            </p>
+            <div id="admin-drop" class="dropzone">
+              <input
+                id="admin-file"
+                type="file"
+                accept="application/json,.json"
+                hidden
+              />
+              <p class="dropzone__title">Drop a .json file here</p>
+              <p class="dropzone__hint">or</p>
+              <button type="button" id="admin-choose" class="submit dropzone__choose">
+                Choose JSON file
+              </button>
+            </div>
+            <div id="admin-status" role="status" aria-live="polite"></div>
+          </section>
+          <div id="admin-toast" class="toast" hidden role="status" aria-live="polite"></div>
+          <p class="footnote">
+            Sequential <code>POST /api/events</code> then <code>POST /api/insight</code>.
+            Charts and Events reload when ingest finishes.
+          </p>
+        </section>
       </main>
     </div>
     <div id="insight-detail" hidden></div>
