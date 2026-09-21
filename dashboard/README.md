@@ -2,7 +2,7 @@
 
 Local feed for career-market events, a **Charts** tab for the same telemetry, a **Market Insights** KPI tab, and a **Playground** tab that posts mock scraper payloads to `POST /api/events`. Logic lives in `src/*.ts` (Playground payload + highlighter in `src/playground.ts`); chart bucketing lives in `src/charts/transforms.ts`; Chart.js lifecycle lives in `src/charts/renderCharts.ts`; presentation lives in `src/styles.css` and the markup in `index.html`.
 
-Brand (v2 locked): void `#05010A`, nebula `#5B2CFF`, corona `#FFB020`, accretion `#FF4FBF`, signal `#2EE6A6`, paper `#F5F2EA`, mute `#8B8794`. Display **Unbounded ExtraBold**, UI **DM Sans**, data **IBM Plex Mono**. Masthead lockup: `public/logo.png` + HARDCALL + corona tagline *the call that shapes your orbit.* Events hero: `public/banner-celestial.png`. Product name stays out of API routes and status enums.
+Brand (v2 locked): void `#05010A`, nebula `#5B2CFF`, corona `#FFB020`, accretion `#FF4FBF`, signal `#2EE6A6`, paper `#F5F2EA`, mute `#8B8794`. Display **Unbounded ExtraBold**, UI **DM Sans**, data **IBM Plex Mono**. Masthead lockup: `public/logo.png` + HARDCALL + corona tagline *the call that shapes your orbit.* Events hero: star-crop of `public/banner-celestial.png` (`public/banner-hero.jpg`) so the strip shows the decision star, not a second HARDCALL lockup. Product name stays out of API routes and status enums.
 
 ## Run locally
 
