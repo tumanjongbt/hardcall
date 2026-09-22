@@ -78,7 +78,7 @@ Each list is `{ "<key>": [rows], "limit", "offset", "total" }`. `total` is the f
 | `/api/credentials` | `credentials` | name, organization, description | `state`, `type` = credential type, `soc`, `cip`, `source` |
 | `/api/licenses` | `licenses` | title, agency | `state`, `source` |
 | `/api/certifications` | `certifications` | name, organization | `type` = cert type, `source` |
-| `/api/econ` | `econ` | title, series, geography | `state` matches `geo_id` or `geo_name`, `source` = `census` \| `bea` \| `fred` |
+| `/api/econ` | `econ` | title, series, geography | `state` matches `geo_id` or `geo_name`, `source` = `census` \| `bea` \| `fred` \| `bls`. `title` and `geo_id` may be null |
 
 Programs include `state` from the joined institution when that row exists. Econ Census rows store published ACS variables (`B19013_001E`, `B23025_003E`, `B23025_005E`, and the other pulled measures). They do not store a rate computed by this API.
 
