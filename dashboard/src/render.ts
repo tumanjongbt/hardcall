@@ -1,4 +1,4 @@
-import { CHANNELS, CHANNEL_LABELS, channelLabel, tagLabel } from "./channels";
+import { CHANNELS, CHANNEL_LABELS, LENS_LABELS, channelLabel, tagLabel } from "./channels";
 import { insightDetailBody, insightTone } from "./insights";
 import { highlightFetchHtml } from "./playground";
 import {
@@ -151,9 +151,10 @@ export function renderMeta(
         : model.demoCount === 0
           ? ` · ${model.liveCount} live`
           : ` · ${model.liveCount} live · ${model.demoCount} demo`;
+  const lens = model.view.lens ? ` · ${LENS_LABELS[model.view.lens]}` : "";
   root.textContent = model.loading
     ? "Loading feed…"
-    : `${model.total} event${model.total === 1 ? "" : "s"} · ${channel}${q}${provenance}`;
+    : `${model.total} event${model.total === 1 ? "" : "s"} · ${channel}${lens}${q}${provenance}`;
 }
 
 export function renderFeed(root: HTMLElement, model: FeedModel): void {
@@ -231,6 +232,7 @@ export type InsightsModel = {
   loadError: string | null;
   lastLoadedAt: string | null;
   openId: string | null;
+  demoNote: string | null;
 };
 
 export function renderTabs(
@@ -282,9 +284,15 @@ export function renderInsights(
     root.append(statusBox("error", model.loadError, "Could not load insights"));
     return;
   }
+  if (model.demoNote) {
+    root.append(el("p", "demo-note", model.demoNote));
+  }
   if (model.insights.length === 0) {
     root.append(
-      statusBox("empty", "No market insights yet. POST /api/insight to publish a KPI.")
+      statusBox(
+        "empty",
+        "No live KPIs in this pull. Warehouse endpoints returned nothing to derive, and GET /api/insights is empty."
+      )
     );
     return;
   }
@@ -314,12 +322,14 @@ function renderKpiCard(
   card.setAttribute("aria-expanded", open ? "true" : "false");
   if (open) card.classList.add("is-open");
   const head = el("div", "kpi-card__head");
-  head.append(sourceBadgeEl(insightSourceBadge(insight.source)));
+  head.append(sourceBadgeEl(insight.value === "No data" ? { label: "No pull", kind: "demo" } : insightSourceBadge(insight.source)));
   head.append(el("p", "kpi-card__title", insight.title));
   card.append(head);
   card.append(el("p", "kpi-card__value", insight.value));
-  const time = el("time", "kpi-card__when", `Updated ${formatWhen(insight.updated_at)}`);
-  time.dateTime = insight.updated_at;
+  const stamp = insight.fetched_at || insight.updated_at;
+  const stampLabel = insight.fetched_at ? "Last pulled" : "Updated";
+  const time = el("time", "kpi-card__when", `${stampLabel} ${formatWhen(stamp)}`);
+  time.dateTime = stamp;
   card.append(time);
   if (onOpen) {
     card.addEventListener("click", () => onOpen(insight.id));
@@ -364,8 +374,9 @@ export function renderInsightDetail(
       detail.textContent = body.text;
     }
     if (when) {
-      when.dateTime = insight.updated_at;
-      when.textContent = `Updated ${formatWhen(insight.updated_at)}`;
+      const stamp = insight.fetched_at || insight.updated_at;
+      when.dateTime = stamp;
+      when.textContent = `${insight.fetched_at ? "Last pulled" : "Updated"} ${formatWhen(stamp)}`;
     }
     return;
   }
@@ -392,8 +403,13 @@ export function renderInsightDetail(
   title.id = "insight-detail-title";
   const badge = sourceBadgeEl(insightSourceBadge(insight.source));
   const value = el("p", "insight-drawer__value", insight.value);
-  const when = el("time", "insight-drawer__when", `Updated ${formatWhen(insight.updated_at)}`);
-  when.dateTime = insight.updated_at;
+  const openedStamp = insight.fetched_at || insight.updated_at;
+  const when = el(
+    "time",
+    "insight-drawer__when",
+    `${insight.fetched_at ? "Last pulled" : "Updated"} ${formatWhen(openedStamp)}`
+  );
+  when.dateTime = openedStamp;
   const detail = el("p", "insight-drawer__detail", body.text);
   if (body.empty) detail.classList.add("is-empty");
 

@@ -25,6 +25,9 @@ test("parseViewState reads bookmark query keys", () => {
       range: 30,
       forecast: 14,
       compare: ["trade", "university"],
+      state: null,
+      cip: null,
+      outlook: null,
     }
   );
   assert.equal(parseViewState("?tab=insights").tab, "insights");
@@ -49,6 +52,9 @@ test("parseViewState restores defaults and ignores unknown channels", () => {
     range: 30,
     forecast: 14,
     compare: ["trade", "university"],
+    state: null,
+    cip: null,
+    outlook: null,
   });
   assert.equal(parseViewState("?perPage=100").perPage, 100);
   assert.equal(parseViewState("?perPage=all").perPage, "all");
@@ -73,6 +79,19 @@ test("parseViewState reads lens, stakeholder alias, range, and compare", () => {
   assert.equal(parseViewState("?forecast=7").forecast, 14);
   assert.deepEqual(parseViewState("?compare=none").compare, []);
   assert.deepEqual(parseViewState("?compare=trade").compare, ["trade"]);
+  assert.equal(parseViewState("?state=ca&cip=11.07&outlook=grow").state, "CA");
+  assert.equal(parseViewState("?state=ca&cip=11.07&outlook=grow").cip, "11.07");
+  assert.equal(parseViewState("?outlook=decline").outlook, "decline");
+  assert.equal(parseViewState("?outlook=nope").outlook, null);
+  assert.equal(
+    hrefForState({
+      ...defaultViewState(),
+      state: "CA",
+      cip: "welding",
+      outlook: "grow",
+    }),
+    "/?page=1&perPage=50&state=CA&cip=welding&outlook=grow"
+  );
 });
 
 test("parseLens and parseRange and parseCompare helpers", () => {
