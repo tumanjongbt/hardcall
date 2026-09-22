@@ -396,6 +396,12 @@ body {
   background: color-mix(in srgb, var(--signal) 14%, transparent);
 }
 
+.source-badge--stale {
+  color: var(--corona);
+  border-color: color-mix(in srgb, var(--corona) 55%, var(--line));
+  background: color-mix(in srgb, var(--corona) 14%, transparent);
+}
+
 .channel-badge,
 .tag {
   font-family: var(--font-ui);

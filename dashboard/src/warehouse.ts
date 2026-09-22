@@ -7,6 +7,8 @@ export type EndpointResult<T> = {
   status: EndpointStatus;
   rows: T[];
   error: string | null;
+  /** Filtered `total` from the list envelope, when the API sent one. */
+  total?: number | null;
 };
 
 export type Provenance = {
@@ -108,6 +110,19 @@ export type EconPoint = Provenance & {
   period: string | null;
 };
 
+export type OccupationRow = Provenance & {
+  soc: string | null;
+  title: string;
+};
+
+export type WarehouseStats = {
+  path: "/api/warehouse";
+  status: EndpointStatus;
+  counts: Record<string, number>;
+  latest_fetched_at: string | null;
+  error: string | null;
+};
+
 export type ApiFeed = {
   id: string;
   label: string | null;
@@ -115,6 +130,19 @@ export type ApiFeed = {
   fetched_at: string | null;
   source_url: string | null;
   count: number | null;
+  /** Server freshness. Null when an older payload only has fetched_at. */
+  status?: "ok" | "stale" | "error" | null;
+  cadence?: string | null;
+  cadence_label?: string | null;
+};
+
+export type WarehouseLoadQuery = {
+  state?: string | null;
+  cip?: string | null;
+  channel?: string | null;
+  outlook?: "grow" | "decline" | null;
+  lens?: AudienceLens | null;
+  q?: string | null;
 };
 
 export type WarehouseSnapshot = {
@@ -128,6 +156,8 @@ export type WarehouseSnapshot = {
   certifications: EndpointResult<CertificationRow>;
   econ: EndpointResult<EconPoint>;
   feeds: EndpointResult<ApiFeed>;
+  occupations: EndpointResult<OccupationRow>;
+  stats: WarehouseStats;
 };
 
 export type DecisionFilters = {
@@ -152,14 +182,18 @@ const UNI_LEVEL =
 const CC_NAME = /community college|technical college|junior college/i;
 
 export function emptyEndpoint<T>(path: string, status: EndpointStatus = "missing"): EndpointResult<T> {
-  return { path, status, rows: [], error: status === "missing" ? null : null };
+  return { path, status, rows: [], error: null, total: null };
+}
+
+function emptyStats(): WarehouseStats {
+  return { path: "/api/warehouse", status: "missing", counts: {}, latest_fetched_at: null, error: null };
 }
 
 export function emptyWarehouse(): WarehouseSnapshot {
   return {
     institutions: emptyEndpoint("/api/institutions"),
-    programs: emptyEndpoint("/api/institutions"),
-    sponsors: emptyEndpoint("/api/institutions"),
+    programs: emptyEndpoint("/api/programs"),
+    sponsors: emptyEndpoint("/api/sponsors"),
     wages: emptyEndpoint("/api/wages"),
     projections: emptyEndpoint("/api/projections"),
     credentials: emptyEndpoint("/api/credentials"),
@@ -167,6 +201,8 @@ export function emptyWarehouse(): WarehouseSnapshot {
     certifications: emptyEndpoint("/api/certifications"),
     econ: emptyEndpoint("/api/econ"),
     feeds: emptyEndpoint("/api/feeds"),
+    occupations: emptyEndpoint("/api/occupations"),
+    stats: emptyStats(),
   };
 }
 
@@ -434,6 +470,38 @@ export function parseLicenses(body: unknown): LicenseRow[] {
     .filter((row): row is LicenseRow => row !== null);
 }
 
+export function parseOccupations(body: unknown): OccupationRow[] {
+  return listFrom(body, ["occupations", "rows"])
+    .map((item) => {
+      const row = asRecord(item);
+      if (!row) return null;
+      const title = str(pick(row, ["title", "occupation_title"]));
+      if (!title) return null;
+      return {
+        soc: str(pick(row, ["onet_soc", "soc_code", "soc"])),
+        title,
+        ...provenance(row, "onet"),
+      } satisfies OccupationRow;
+    })
+    .filter((row): row is OccupationRow => row !== null);
+}
+
+export function parseWarehouseStats(body: unknown): { counts: Record<string, number>; latest_fetched_at: string | null } {
+  const root = asRecord(body) ?? {};
+  const warehouse = asRecord(pick(root, ["warehouse"])) ?? root;
+  const counts: Record<string, number> = {};
+  for (const [key, value] of Object.entries(warehouse)) {
+    if (key === "latest_fetched_at" || key === "ok") continue;
+    const parsed = num(value);
+    if (parsed == null || parsed < 0) continue;
+    counts[key] = parsed;
+  }
+  return {
+    counts,
+    latest_fetched_at: str(pick(warehouse, ["latest_fetched_at"])),
+  };
+}
+
 export function parseCertifications(body: unknown): CertificationRow[] {
   return listFrom(body, ["certifications", "certs", "rows", "items"])
     .map((item, index) => {
@@ -477,8 +545,38 @@ function pushEcon(
   });
 }
 
+function datasetForIndicator(source: string, seriesId: string): EconPoint["dataset"] | null {
+  if (source === "census" || source === "bea" || source === "fred") return source;
+  if (/^B\d/i.test(seriesId)) return "census";
+  return null;
+}
+
+function parseEconIndicators(items: unknown[]): EconPoint[] {
+  const points: EconPoint[] = [];
+  for (const item of items) {
+    const row = asRecord(item);
+    if (!row) continue;
+    const value = num(pick(row, ["value"]));
+    if (value == null) continue;
+    const seriesId = str(pick(row, ["series_id", "indicator"])) ?? "";
+    const source = str(pick(row, ["source"])) ?? "";
+    const dataset = datasetForIndicator(source, seriesId);
+    if (!dataset) continue;
+    const title = (str(pick(row, ["title"])) ?? seriesId) || "Indicator";
+    pushEcon(points, row, dataset, dataset, title, value, {
+      name: str(pick(row, ["geo_name", "name"])) ?? title,
+      geo: str(pick(row, ["geo_id", "geo_name", "geo"])),
+      period: str(pick(row, ["period", "date", "year"])),
+      unit: str(pick(row, ["unit"])),
+    });
+  }
+  return points;
+}
+
 export function parseEcon(body: unknown): EconPoint[] {
   const root = unwrap(body);
+  const indicators = parseEconIndicators(listFrom(root, ["econ", "econ_indicators", "indicators"]));
+  if (indicators.length > 0) return indicators;
   const points: EconPoint[] = [];
   for (const item of listFrom(root, ["census", "acs", "places"])) {
     const row = asRecord(item);
@@ -556,6 +654,12 @@ export function parseEcon(body: unknown): EconPoint[] {
   return points;
 }
 
+function feedStatusValue(value: unknown): ApiFeed["status"] {
+  const text = str(value);
+  if (text === "ok" || text === "stale" || text === "error") return text;
+  return null;
+}
+
 export function parseFeeds(body: unknown): ApiFeed[] {
   return listFrom(body, ["feeds", "sources", "datasets", "rows"])
     .map((item) => {
@@ -563,14 +667,18 @@ export function parseFeeds(body: unknown): ApiFeed[] {
       if (!row) return null;
       const id = str(pick(row, ["id", "key", "source", "name"]));
       if (!id) return null;
-      return {
+      const feed: ApiFeed = {
         id,
         label: str(pick(row, ["label", "name", "title"])),
         source: str(pick(row, ["source", "id"])),
-        fetched_at: str(pick(row, ["fetched_at", "fetchedAt", "last_fetched_at"])),
+        fetched_at: str(pick(row, ["last_fetched_at", "fetched_at", "fetchedAt"])),
         source_url: httpUrl(pick(row, ["source_url", "sourceUrl", "url"])),
-        count: num(pick(row, ["count", "rows"])),
-      } satisfies ApiFeed;
+        count: num(pick(row, ["rows", "count"])),
+        status: feedStatusValue(pick(row, ["status"])),
+        cadence: str(pick(row, ["cadence"])),
+        cadence_label: str(pick(row, ["cadence_label", "cadenceLabel"])),
+      };
+      return feed;
     })
     .filter((row): row is ApiFeed => row !== null);
 }
@@ -597,96 +705,254 @@ async function readEndpoint(path: string, base: string, fetchImpl: FetchLike): P
   }
 }
 
+const PAGE_LIMIT = "200";
+
+function cipQuery(cip: string | null | undefined): string | null {
+  if (!cip) return null;
+  return /^[0-9A-Za-z.]{1,32}$/.test(cip) ? cip : null;
+}
+
+function textQuery(q: string | null | undefined, cip: string | null | undefined): string | null {
+  const search = (q ?? "").trim();
+  if (search) return search.slice(0, 200);
+  if (cip && !cipQuery(cip)) return cip.slice(0, 200);
+  return null;
+}
+
+function listQuery(
+  query: WarehouseLoadQuery | undefined,
+  extra: Record<string, string | null | undefined> = {}
+): string {
+  const params = new URLSearchParams();
+  params.set("limit", PAGE_LIMIT);
+  const state = query?.state?.trim();
+  const q = textQuery(query?.q, query?.cip);
+  if (state) params.set("state", state.slice(0, 64));
+  if (q) params.set("q", q);
+  for (const [key, value] of Object.entries(extra)) {
+    if (value) params.set(key, value);
+  }
+  return params.toString();
+}
+
+function projectionOutlook(query: WarehouseLoadQuery | undefined): "grow" | "decline" | null {
+  if (query?.outlook === "grow" || query?.outlook === "decline") return query.outlook;
+  if (query?.lens === "students") return "grow";
+  if (query?.lens === "parents") return "decline";
+  return null;
+}
+
+function collegeChannel(channel: string | null | undefined): string | null {
+  return channel === "university" || channel === "community_college" ? channel : null;
+}
+
+function pageTotal(body: unknown): number | null {
+  const rec = asRecord(body);
+  if (!rec) return null;
+  const value = num(pick(rec, ["total"]));
+  if (value == null || value < 0) return null;
+  return value;
+}
+
+function pageOf<T>(
+  path: string,
+  result: { status: EndpointStatus; body: unknown; error: string | null },
+  parse: (body: unknown) => T[]
+): EndpointResult<T> {
+  return {
+    path,
+    status: result.status,
+    rows: result.status === "ok" ? parse(result.body) : [],
+    error: result.error,
+    total: result.status === "ok" ? pageTotal(result.body) : null,
+  };
+}
+
+async function loadProjectionPages(
+  base: string,
+  fetchImpl: FetchLike,
+  projectionQs: (cut: "grow" | "decline" | null) => string,
+  outlook: "grow" | "decline" | null
+): Promise<Array<{ status: EndpointStatus; body: unknown; error: string | null }>> {
+  const cuts: Array<"grow" | "decline" | null> = outlook === null ? ["grow", "decline"] : [outlook];
+  return Promise.all(cuts.map((cut) => readProjectionCut(base, fetchImpl, projectionQs(cut), cut)));
+}
+
+async function readProjectionCut(
+  base: string,
+  fetchImpl: FetchLike,
+  qs: string,
+  cut: "grow" | "decline" | null
+): Promise<{ status: EndpointStatus; body: unknown; error: string | null }> {
+  const first = await readEndpoint(`/api/projections?${qs}`, base, fetchImpl);
+  if (first.status !== "ok" || cut !== "decline") return first;
+  const total = pageTotal(first.body);
+  if (total == null || total <= Number(PAGE_LIMIT)) return first;
+  const offset = total - Number(PAGE_LIMIT);
+  const params = new URLSearchParams(qs);
+  params.set("offset", String(offset));
+  const tail = await readEndpoint(`/api/projections?${params.toString()}`, base, fetchImpl);
+  return tail.status === "ok" ? tail : first;
+}
+
 export async function loadWarehouse(
   base: string,
-  fetchImpl: FetchLike = fetch
+  fetchImpl: FetchLike = fetch,
+  query?: WarehouseLoadQuery
 ): Promise<WarehouseSnapshot> {
-  const paths = [
-    "/api/institutions",
-    "/api/wages",
-    "/api/projections",
-    "/api/credentials",
-    "/api/licenses",
-    "/api/certifications",
-    "/api/econ",
-    "/api/feeds",
-  ] as const;
-  const results = await Promise.all(paths.map((path) => readEndpoint(path, base, fetchImpl)));
-  const byPath = new Map(paths.map((path, index) => [path, results[index]!]));
-  const institutions = byPath.get("/api/institutions")!;
-  const institutionStatus = institutions.status;
+  const cip = cipQuery(query?.cip);
+  const college = collegeChannel(query?.channel);
+  const sponsorChannel = !query?.channel || query.channel === "apprenticeship" ? query?.channel ?? null : null;
+  const outlook = projectionOutlook(query);
+  const shared = listQuery(query);
+  const institutionQs = listQuery(query, { channel: college });
+  const programQs = listQuery(query, { channel: college, cip });
+  const sponsorQs = listQuery(query, {
+    channel: query?.channel && query.channel !== "apprenticeship" ? query.channel : sponsorChannel,
+  });
+  const credentialQs = listQuery(query, { cip });
+  const projectionQs = (cut: "grow" | "decline" | null) =>
+    listQuery(query, { outlook: cut });
+
+  const requests: Array<[string, string]> = [
+    ["/api/institutions", institutionQs],
+    ["/api/programs", programQs],
+    ["/api/sponsors", sponsorQs],
+    ["/api/occupations", shared],
+    ["/api/wages", shared],
+    ["/api/credentials", credentialQs],
+    ["/api/licenses", shared],
+    ["/api/certifications", shared],
+    ["/api/econ", shared],
+    ["/api/feeds", ""],
+    ["/api/warehouse", ""],
+  ];
+
+  const results = await Promise.all(
+    requests.map(async ([path, qs]) => {
+      const target = qs ? `${path}?${qs}` : path;
+      const result = await readEndpoint(target, base, fetchImpl);
+      return { path: path.split("?")[0]!, result };
+    })
+  );
+  const projectionResults = await loadProjectionPages(base, fetchImpl, projectionQs, outlook);
+  const first = (path: string) => results.find((item) => item.path === path)?.result;
+  const institutions = first("/api/institutions") ?? { status: "missing" as const, body: null, error: null };
+  const programs = first("/api/programs") ?? { status: "missing" as const, body: null, error: null };
+  const sponsors = first("/api/sponsors") ?? { status: "missing" as const, body: null, error: null };
+  const programRows = programs.status === "ok" ? parsePrograms(programs.body) : [];
+  const embeddedPrograms =
+    programs.status === "missing" && institutions.status === "ok" ? parsePrograms(institutions.body) : [];
+  const sponsorRows = sponsors.status === "ok" ? parseSponsors(sponsors.body) : [];
+  const embeddedSponsors =
+    sponsors.status === "missing" && institutions.status === "ok" ? parseSponsors(institutions.body) : [];
+  const projectionOk = projectionResults.some((item) => item.status === "ok");
+  const projectionMissing = projectionResults.every((item) => item.status === "missing");
+  const projectionRows = projectionResults.flatMap((item) =>
+    item.status === "ok" ? parseProjections(item.body) : []
+  );
+  const seenProjection = new Set<string>();
+  const projections = projectionRows.filter((row) => {
+    const key = `${row.soc_code ?? ""}:${row.occupation_title}:${row.change_percent ?? ""}`;
+    if (seenProjection.has(key)) return false;
+    seenProjection.add(key);
+    return true;
+  });
+  const projectionTotal = projectionResults.every((item) => item.status === "ok")
+    ? projectionResults.reduce((sum, item) => {
+        const total = pageTotal(item.body);
+        return total == null ? Number.NaN : sum + total;
+      }, 0)
+    : null;
+  const warehouseBody = first("/api/warehouse") ?? { status: "missing" as const, body: null, error: null };
+  const parsedStats = warehouseBody.status === "ok" ? parseWarehouseStats(warehouseBody.body) : null;
+
   return {
-    institutions: {
-      path: "/api/institutions",
-      status: institutionStatus,
-      rows: institutionStatus === "ok" ? parseInstitutions(institutions.body) : [],
-      error: institutions.error,
-    },
-    programs: {
-      path: "/api/institutions",
-      status: institutionStatus,
-      rows: institutionStatus === "ok" ? parsePrograms(institutions.body) : [],
-      error: institutions.error,
-    },
-    sponsors: {
-      path: "/api/institutions",
-      status: institutionStatus,
-      rows: institutionStatus === "ok" ? parseSponsors(institutions.body) : [],
-      error: institutions.error,
-    },
-    wages: {
-      path: "/api/wages",
-      status: byPath.get("/api/wages")!.status,
-      rows: byPath.get("/api/wages")!.status === "ok" ? parseWages(byPath.get("/api/wages")!.body) : [],
-      error: byPath.get("/api/wages")!.error,
-    },
+    institutions: pageOf("/api/institutions", institutions, parseInstitutions),
+    programs:
+      programs.status === "ok"
+        ? {
+            path: "/api/programs",
+            status: "ok",
+            rows: programRows,
+            error: null,
+            total: pageTotal(programs.body),
+          }
+        : embeddedPrograms.length > 0
+          ? {
+              path: "/api/institutions",
+              status: "ok",
+              rows: embeddedPrograms,
+              error: programs.error,
+              total: null,
+            }
+          : {
+              path: "/api/programs",
+              status: programs.status,
+              rows: [],
+              error: programs.error,
+              total: null,
+            },
+    sponsors:
+      sponsors.status === "ok"
+        ? {
+            path: "/api/sponsors",
+            status: "ok",
+            rows: sponsorRows,
+            error: null,
+            total: pageTotal(sponsors.body),
+          }
+        : embeddedSponsors.length > 0
+          ? {
+              path: "/api/institutions",
+              status: "ok",
+              rows: embeddedSponsors,
+              error: sponsors.error,
+              total: null,
+            }
+          : {
+              path: "/api/sponsors",
+              status: sponsors.status,
+              rows: [],
+              error: sponsors.error,
+              total: null,
+            },
+    wages: pageOf("/api/wages", first("/api/wages") ?? { status: "missing", body: null, error: null }, parseWages),
     projections: {
       path: "/api/projections",
-      status: byPath.get("/api/projections")!.status,
-      rows:
-        byPath.get("/api/projections")!.status === "ok"
-          ? parseProjections(byPath.get("/api/projections")!.body)
-          : [],
-      error: byPath.get("/api/projections")!.error,
+      status: projectionOk ? "ok" : projectionMissing ? "missing" : "error",
+      rows: projections,
+      error: projectionResults.find((item) => item.error)?.error ?? null,
+      total: projectionTotal != null && Number.isFinite(projectionTotal) ? projectionTotal : null,
     },
-    credentials: {
-      path: "/api/credentials",
-      status: byPath.get("/api/credentials")!.status,
-      rows:
-        byPath.get("/api/credentials")!.status === "ok"
-          ? parseCredentials(byPath.get("/api/credentials")!.body)
-          : [],
-      error: byPath.get("/api/credentials")!.error,
-    },
-    licenses: {
-      path: "/api/licenses",
-      status: byPath.get("/api/licenses")!.status,
-      rows:
-        byPath.get("/api/licenses")!.status === "ok"
-          ? parseLicenses(byPath.get("/api/licenses")!.body)
-          : [],
-      error: byPath.get("/api/licenses")!.error,
-    },
-    certifications: {
-      path: "/api/certifications",
-      status: byPath.get("/api/certifications")!.status,
-      rows:
-        byPath.get("/api/certifications")!.status === "ok"
-          ? parseCertifications(byPath.get("/api/certifications")!.body)
-          : [],
-      error: byPath.get("/api/certifications")!.error,
-    },
-    econ: {
-      path: "/api/econ",
-      status: byPath.get("/api/econ")!.status,
-      rows: byPath.get("/api/econ")!.status === "ok" ? parseEcon(byPath.get("/api/econ")!.body) : [],
-      error: byPath.get("/api/econ")!.error,
-    },
-    feeds: {
-      path: "/api/feeds",
-      status: byPath.get("/api/feeds")!.status,
-      rows: byPath.get("/api/feeds")!.status === "ok" ? parseFeeds(byPath.get("/api/feeds")!.body) : [],
-      error: byPath.get("/api/feeds")!.error,
+    credentials: pageOf(
+      "/api/credentials",
+      first("/api/credentials") ?? { status: "missing", body: null, error: null },
+      parseCredentials
+    ),
+    licenses: pageOf(
+      "/api/licenses",
+      first("/api/licenses") ?? { status: "missing", body: null, error: null },
+      parseLicenses
+    ),
+    certifications: pageOf(
+      "/api/certifications",
+      first("/api/certifications") ?? { status: "missing", body: null, error: null },
+      parseCertifications
+    ),
+    econ: pageOf("/api/econ", first("/api/econ") ?? { status: "missing", body: null, error: null }, parseEcon),
+    feeds: pageOf("/api/feeds", first("/api/feeds") ?? { status: "missing", body: null, error: null }, parseFeeds),
+    occupations: pageOf(
+      "/api/occupations",
+      first("/api/occupations") ?? { status: "missing", body: null, error: null },
+      parseOccupations
+    ),
+    stats: {
+      path: "/api/warehouse",
+      status: warehouseBody.status,
+      counts: parsedStats?.counts ?? {},
+      latest_fetched_at: parsedStats?.latest_fetched_at ?? null,
+      error: warehouseBody.error,
     },
   };
 }
@@ -964,7 +1230,7 @@ export function costEarningsSeries(
     return {
       points: [],
       metric: "Program median debt vs median earnings",
-      emptyReason: "GET /api/institutions did not load, so program debt and earnings are unavailable.",
+      emptyReason: "GET /api/programs is not on this API yet.",
       shown: 0,
       total: 0,
     };
@@ -1068,6 +1334,8 @@ export function channelMix(snapshot: WarehouseSnapshot, filters: DecisionFilters
     .map(([channel, count]) => ({ channel, count }));
   const anyEndpointOk = [
     snapshot.institutions,
+    snapshot.programs,
+    snapshot.sponsors,
     snapshot.wages,
     snapshot.licenses,
     snapshot.certifications,
@@ -1338,9 +1606,11 @@ export function decisionTiles(snapshot: WarehouseSnapshot, filters: DecisionFilt
         title: "Debt vs median earnings",
         value: "No data",
         detail:
-          snapshot.institutions.status === "missing"
-            ? "GET /api/institutions is not on this API yet."
-            : "No program rows include both median_debt and median_earnings.",
+          snapshot.programs.status === "missing"
+            ? "GET /api/programs is not on this API yet."
+            : snapshot.programs.status === "error"
+              ? snapshot.programs.error ?? "GET /api/programs failed."
+              : "No program rows include both median_debt and median_earnings.",
         source: "",
         source_url: null,
         fetched_at: null,
@@ -1500,7 +1770,7 @@ export function decisionTiles(snapshot: WarehouseSnapshot, filters: DecisionFilt
         id: "wh:apprenticeship",
         title: "Registered apprenticeship sponsors",
         value: "No data",
-        detail: "GET /api/institutions is not on this API yet, so apprenticeship sponsor rows are unavailable.",
+        detail: "GET /api/sponsors is not on this API yet, so apprenticeship sponsor rows are unavailable.",
         source: "",
         source_url: null,
         fetched_at: null,
@@ -1521,8 +1791,8 @@ export function decisionTiles(snapshot: WarehouseSnapshot, filters: DecisionFilt
           snapshot.sponsors.status === "error"
             ? snapshot.sponsors.error ?? "Sponsor rows failed to load."
             : sponsors.length === 0
-              ? "This institutions payload included no apprenticeship_sponsors rows. A zero here means the list was empty, not an estimated count. Directory rows are not job openings."
-              : `Count of sponsor rows returned. Directory rows, not job openings. ${filters.state ? `Filtered to ${filters.state}.` : ""}`,
+              ? "GET /api/sponsors returned no sponsor rows. An empty list is not an estimated count. Directory rows are not job openings."
+              : `Count of sponsor rows returned${capClause(snapshot.sponsors)}. Directory rows, not job openings. ${filters.state ? `Filtered to ${filters.state}.` : ""}`,
         ...prov,
         empty: snapshot.sponsors.status === "error",
         lenses: ["students", "counselors", "all"],
@@ -1587,10 +1857,12 @@ export function decisionTiles(snapshot: WarehouseSnapshot, filters: DecisionFilt
       value: snapshot.programs.status === "ok" ? formatCount(programs.length) : "No data",
       detail:
         snapshot.programs.status === "missing"
-          ? "GET /api/institutions is not on this API yet."
-          : snapshot.programs.rows.length === 0
-            ? "This institutions response did not include program CIP rows."
-            : "Count of program rows matching the CIP filter (all programs when the filter is empty).",
+          ? "GET /api/programs is not on this API yet."
+          : snapshot.programs.status === "error"
+            ? snapshot.programs.error ?? "GET /api/programs failed."
+            : snapshot.programs.rows.length === 0
+              ? "GET /api/programs returned no program rows."
+              : `Count of program rows matching the CIP filter (all programs on this page when the filter is empty).${capClause(snapshot.programs)}`,
       source: programs[0]?.source || "",
       source_url: programs[0]?.source_url ?? null,
       fetched_at: programs[0]?.fetched_at ?? null,
@@ -1608,7 +1880,7 @@ export function decisionTiles(snapshot: WarehouseSnapshot, filters: DecisionFilt
       detail:
         snapshot.institutions.status === "missing"
           ? "GET /api/institutions is not on this API yet."
-          : "Count of institution rows with a state field, narrowed when a state filter is set.",
+          : `Count of institution rows with a state field, narrowed when a state filter is set.${capClause(snapshot.institutions)}`,
       source: institutions[0]?.source || "",
       source_url: institutions[0]?.source_url ?? null,
       fetched_at: institutions[0]?.fetched_at ?? null,
@@ -1619,6 +1891,11 @@ export function decisionTiles(snapshot: WarehouseSnapshot, filters: DecisionFilt
 
   tiles.push(...econTiles(snapshot, filters));
   return tiles;
+}
+
+function capClause(endpoint: { path: string; rows: unknown[]; total?: number | null }): string {
+  if (endpoint.total == null || endpoint.total <= endpoint.rows.length) return "";
+  return ` GET ${endpoint.path} reports ${formatCount(endpoint.total)} matching rows; this page shows ${formatCount(endpoint.rows.length)}.`;
 }
 
 function endpointCountTile(
@@ -1659,7 +1936,7 @@ function endpointCountTile(
     id,
     title,
     value: formatCount(count),
-    detail: `Count of rows returned by GET ${endpoint.path}${count === 0 ? ". The endpoint responded and the list was empty." : "."}`,
+    detail: `Count of rows returned by GET ${endpoint.path}${count === 0 ? ". The endpoint responded and the list was empty." : "."}${capClause(endpoint)}`,
     source: sample?.source ?? "",
     source_url: sample?.source_url ?? null,
     fetched_at: sample?.fetched_at ?? null,
@@ -1718,6 +1995,7 @@ export type FeedCard = {
   id: string;
   label: string;
   live: boolean;
+  freshness: "live" | "stale" | "missing";
   fetchedAt: string | null;
   sourceUrl: string | null;
   homeUrl: string;
@@ -1774,10 +2052,18 @@ function matchFeed(feeds: ApiFeed[], catalogId: string, sources: string[]): ApiF
   );
 }
 
+function freshnessFor(feed: ApiFeed | null, fetchedAt: string | null): FeedCard["freshness"] {
+  if (feed?.status === "ok") return "live";
+  if (feed?.status === "stale") return "stale";
+  if (feed?.status === "error") return "missing";
+  return fetchedAt ? "live" : "missing";
+}
+
 export function buildFeedStrip(
   snapshot: WarehouseSnapshot,
   opts: {
     latestFetchedAt?: string | null;
+    metaFeeds?: ApiFeed[];
     events?: Array<{ source?: string | null; source_url?: string | null; fetched_at?: string | null }>;
   } = {}
 ): FeedStrip {
@@ -1796,6 +2082,7 @@ export function buildFeedStrip(
   for (const row of snapshot.licenses.rows) add(row.source || "careeronestop", row);
   for (const row of snapshot.certifications.rows) add(row.source || "careeronestop", row);
   for (const row of snapshot.econ.rows) add(row.source || row.dataset, row);
+  for (const row of snapshot.occupations.rows) add(row.source || "onet", row);
   for (const event of opts.events ?? []) {
     if (!event.source) continue;
     add(event.source, {
@@ -1805,25 +2092,32 @@ export function buildFeedStrip(
     });
   }
 
+  const feedRows = snapshot.feeds.status === "ok" ? snapshot.feeds.rows : opts.metaFeeds ?? [];
   const cards = FEED_CATALOG.map((catalog) => {
-    const api = snapshot.feeds.status === "ok" ? matchFeed(snapshot.feeds.rows, catalog.id, catalog.sources) : null;
+    const api = matchFeed(feedRows, catalog.id, catalog.sources);
     const rows = catalog.sources.flatMap((source) => evidence.get(source) ?? []);
     const fromRows = latestStamp(rows);
-    const fetchedAt = api?.fetched_at ?? fromRows.fetched_at;
-    const sourceUrl = api?.source_url ?? fromRows.source_url;
-    const count = api?.count ?? (rows.length > 0 ? rows.length : null);
-    const live = Boolean(fetchedAt);
-    let note = "Not pulled yet.";
-    if (live) note = "Last pulled. Periodic government release, not a live tick.";
-    else if (snapshot.feeds.status === "missing" && rows.length === 0) note = "This API has not reported a pull for this dataset.";
-    else if (rows.length > 0 && !fetchedAt) note = "Rows returned without fetched_at.";
-    if (catalog.id === "credential_engine" && !live) {
-      note = "Not pulled. Credential Engine stays dark until GET /api/credentials or GET /api/feeds reports fetched_at. CareerOneStop certifications are a separate card.";
+    const fetchedAt = api?.fetched_at ?? (api ? null : fromRows.fetched_at);
+    const sourceUrl = api?.source_url ?? (api ? null : fromRows.source_url);
+    const count = api?.count ?? (api ? null : rows.length > 0 ? rows.length : null);
+    const freshness = freshnessFor(api, fetchedAt);
+    const live = freshness === "live";
+    let note = api?.cadence_label ?? "Not pulled yet.";
+    if (!api?.cadence_label) {
+      if (freshness === "live") note = "Last pulled. Periodic government release, not a live tick.";
+      else if (freshness === "stale") note = "Last pulled, and older than this feed's window. Not a live tick.";
+      else if (snapshot.feeds.status === "missing" && feedRows.length === 0 && rows.length === 0) {
+        note = "This API has not reported a pull for this dataset.";
+      } else if (rows.length > 0 && !fetchedAt) note = "Rows returned without fetched_at.";
+    }
+    if (catalog.id === "credential_engine" && freshness === "missing" && !api?.cadence_label) {
+      note = "Not pulled. Credential Engine stays dark until GET /api/feeds reports last_fetched_at. CareerOneStop certifications are a separate card.";
     }
     return {
       id: catalog.id,
       label: api?.label || catalog.label,
       live,
+      freshness,
       fetchedAt,
       sourceUrl,
       homeUrl: catalog.homeUrl,
@@ -1842,6 +2136,17 @@ export function buildFeedStrip(
   if (opts.latestFetchedAt && cards.every((card) => !card.fetchedAt)) {
     detail += ` GET /api/meta reports warehouse latest_fetched_at ${opts.latestFetchedAt}, not broken out by dataset.`;
   }
+  if (snapshot.stats.status === "ok") {
+    const bits = Object.entries(snapshot.stats.counts).map(([key, value]) => `${key} ${formatCount(value)}`);
+    if (bits.length > 0) detail += ` GET /api/warehouse stored counts: ${bits.join(", ")}.`;
+    if (snapshot.stats.latest_fetched_at && !opts.latestFetchedAt && cards.every((card) => !card.fetchedAt)) {
+      detail += ` GET /api/warehouse reports latest_fetched_at ${snapshot.stats.latest_fetched_at}.`;
+    }
+  } else if (snapshot.stats.status === "missing") {
+    detail += " GET /api/warehouse is not on this API yet.";
+  } else if (snapshot.stats.error) {
+    detail += ` ${snapshot.stats.error}`;
+  }
   return { cards, detail };
 }
 
@@ -1850,6 +2155,9 @@ export function warehouseGaps(snapshot: WarehouseSnapshot): string[] {
   const seen = new Set<string>();
   for (const endpoint of [
     snapshot.institutions,
+    snapshot.programs,
+    snapshot.sponsors,
+    snapshot.occupations,
     snapshot.wages,
     snapshot.projections,
     snapshot.credentials,
@@ -1863,5 +2171,7 @@ export function warehouseGaps(snapshot: WarehouseSnapshot): string[] {
     if (endpoint.status === "missing") gaps.push(`${endpoint.path} is not on this API yet.`);
     else if (endpoint.status === "error" && endpoint.error) gaps.push(endpoint.error);
   }
+  if (snapshot.stats.status === "missing") gaps.push(`${snapshot.stats.path} is not on this API yet.`);
+  else if (snapshot.stats.status === "error" && snapshot.stats.error) gaps.push(snapshot.stats.error);
   return gaps;
 }

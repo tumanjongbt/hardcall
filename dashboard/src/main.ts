@@ -58,10 +58,12 @@ import {
   emptyWarehouse,
   loadWarehouse,
   mergeInsightRows,
+  parseFeeds,
   tilesForLens,
   tilesToInsights,
   visibleApiInsights,
   warehouseGaps,
+  type ApiFeed,
   type DecisionFilters,
   type WarehouseSnapshot,
 } from "./warehouse";
@@ -138,6 +140,8 @@ let allowDemo = import.meta.env.VITE_HARDCALL_ALLOW_DEMO !== "false";
 let warehouseFetchedAt: string | null = null;
 let warehouse: WarehouseSnapshot = emptyWarehouse();
 let warehouseLoading = true;
+let warehouseGeneration = 0;
+let metaFeeds: ApiFeed[] = [];
 
 function must<T extends HTMLElement = HTMLElement>(selector: string): T {
   const node = document.querySelector<T>(selector);
@@ -228,7 +232,11 @@ function paint(): void {
     feedsEl,
     warehouseLoading
       ? null
-      : buildFeedStrip(warehouse, { latestFetchedAt: warehouseFetchedAt, events: allEvents }),
+      : buildFeedStrip(warehouse, {
+          latestFetchedAt: warehouseFetchedAt,
+          events: allEvents,
+          metaFeeds,
+        }),
     warehouseLoading
   );
   const showPaths = view.tab === "events" || view.tab === "insights" || view.tab === "charts";
@@ -318,10 +326,23 @@ function paint(): void {
   }
 }
 
+function sameWarehouseQuery(a: ViewState, b: ViewState): boolean {
+  return (
+    a.channel === b.channel &&
+    a.state === b.state &&
+    a.cip === b.cip &&
+    a.outlook === b.outlook &&
+    a.lens === b.lens &&
+    a.q === b.q
+  );
+}
+
 function pushView(next: ViewState): void {
+  const prev = view;
   view = next;
   history.pushState(view, "", hrefForState(view, location.pathname));
   paint();
+  if (!sameWarehouseQuery(prev, next)) void loadWarehouseRows();
 }
 
 function setTab(tab: DashboardTab): void {
@@ -737,9 +758,11 @@ window.addEventListener("popstate", () => {
   commitSearch.cancel();
   commitState.cancel();
   commitCip.cancel();
+  const prev = view;
   view = parseViewState(location.search);
   searchEl.value = view.q;
   paint();
+  if (!sameWarehouseQuery(prev, view)) void loadWarehouseRows();
 });
 
 function prependLive(row: EventRow): void {
@@ -811,15 +834,28 @@ async function loadInsights(): Promise<void> {
 }
 
 async function loadWarehouseRows(): Promise<void> {
+  const generation = ++warehouseGeneration;
   warehouseLoading = true;
   paint();
   try {
-    warehouse = await loadWarehouse(apiBase());
+    const next = await loadWarehouse(apiBase(), fetch, {
+      state: view.state,
+      cip: view.cip,
+      channel: view.channel,
+      outlook: view.outlook,
+      lens: view.lens,
+      q: view.q,
+    });
+    if (generation !== warehouseGeneration) return;
+    warehouse = next;
   } catch {
+    if (generation !== warehouseGeneration) return;
     warehouse = emptyWarehouse();
   } finally {
-    warehouseLoading = false;
-    paint();
+    if (generation === warehouseGeneration) {
+      warehouseLoading = false;
+      paint();
+    }
   }
 }
 
@@ -828,6 +864,7 @@ async function loadMeta(): Promise<void> {
     const meta = await fetchMeta();
     allowDemo = meta.allow_demo;
     warehouseFetchedAt = meta.warehouse?.latest_fetched_at ?? null;
+    metaFeeds = parseFeeds({ feeds: meta.feeds ?? [] });
   } catch {
     // Keep the Vite default; paint still works if /api/meta is not deployed yet.
   }

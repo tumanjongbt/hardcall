@@ -133,8 +133,8 @@ export function renderFeedStrip(root: HTMLElement, strip: FeedStrip | null, load
     item.dataset.feed = card.id;
     const badge = el(
       "span",
-      card.live ? "source-badge source-badge--live" : "source-badge source-badge--demo",
-      card.live ? "Live" : "Not pulled"
+      `source-badge source-badge--${card.freshness === "live" ? "live" : card.freshness === "stale" ? "stale" : "demo"}`,
+      card.freshness === "live" ? "Live" : card.freshness === "stale" ? "Stale" : "Not pulled"
     );
     item.append(badge);
     item.append(el("p", "feed-card__label", card.label));
@@ -156,11 +156,13 @@ export function renderFeedStrip(root: HTMLElement, strip: FeedStrip | null, load
       link.rel = "noopener noreferrer";
       item.append(link);
     }
-    const home = el("a", "feed-card__link feed-card__link--home", "Dataset home");
-    home.href = card.homeUrl;
-    home.target = "_blank";
-    home.rel = "noopener noreferrer";
-    item.append(home);
+    if (card.homeUrl && card.homeUrl !== card.sourceUrl) {
+      const home = el("a", "feed-card__link feed-card__link--home", "Dataset home");
+      home.href = card.homeUrl;
+      home.target = "_blank";
+      home.rel = "noopener noreferrer";
+      item.append(home);
+    }
     list.append(item);
   }
   root.append(list);

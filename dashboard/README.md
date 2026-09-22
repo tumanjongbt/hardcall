@@ -25,7 +25,7 @@ npm run build
 
 `VITE_EVENTS_API_URL` — API **origin only** (scheme + host[:port]). Paths, query strings, and non-http(s) values are ignored and the default origin is used. Default: `https://hardcall-api.onrender.com`.
 
-This value is **public**. Vite inlines every `VITE_*` key into the static bundle. Do not put tokens, passwords, or `DATABASE_URL` here. The browser fetches that origin for `/api/events`, `/api/events/stream`, `/api/insights`, `/api/meta`, and, when deployed, `/api/institutions`, `/api/wages`, `/api/projections`, `/api/credentials`, `/api/licenses`, `/api/certifications`, `/api/econ`, and `/api/feeds`. A 404 on a warehouse route leaves that card empty. It does not invent rows. `POST /api/events` and `POST /api/insight` stay on the demo tabs.
+This value is **public**. Vite inlines every `VITE_*` key into the static bundle. Do not put tokens, passwords, or `DATABASE_URL` here. The browser fetches that origin for `/api/events`, `/api/events/stream`, `/api/insights`, `/api/meta`, `/api/warehouse`, `/api/feeds`, `/api/institutions`, `/api/programs`, `/api/sponsors`, `/api/occupations`, `/api/wages`, `/api/projections`, `/api/credentials`, `/api/licenses`, `/api/certifications`, and `/api/econ`. Lists ask for `limit=200`. A 404 leaves that card empty. The dashboard does not invent rows. Feed cards use `status` `ok` / `stale` / `error` and say last pulled, not a live tick. `POST /api/events` and `POST /api/insight` stay on the demo tabs.
 
 The API answers CORS with `Access-Control-Allow-Origin: *` (plus `GET,POST,OPTIONS` and `Content-Type`) so a local Vite origin or a later hosted dashboard can read and post. Tighten that header when ingest auth lands.
 
