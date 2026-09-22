@@ -5,9 +5,9 @@
 **Repo:** `tumanjongbt/hardcall`  
 **Scope:** US-only production ingest (no notional/demo data in prod)  
 **Report date:** 2026-09-21 (America/New_York)  
-**Status:** Canonical research map. **Phase A keyless bulk is implemented** (`scorecard` institution+FoS zips, `bls` OEWS tables, `onet` database CSV) plus the keyless `apprenticeship_gov` partner CSV (Phase B in the matrix; shipped because it needs no key). Reserved enums include Phase B/C sources (`ipeds`, `careeronestop`, `census`, `bea`, `fred`) so public POST cannot spoof them. **No CareerOneStop / IPEDS / Census / BEA / FRED adapters yet.** CareerOneStop must never store Bing geocodes.
+**Status:** Canonical research map. **Phase A keyless bulk is implemented** (`scorecard` institution+FoS zips, `bls` OEWS tables, `onet` database CSV) plus the keyless `apprenticeship_gov` partner CSV (Phase B in the matrix; shipped because it needs no key). Reserved enums include Phase B/C sources (`ipeds`, `careeronestop`, `census`, `bea`, `fred`) so public POST cannot spoof them. **`bls_ep`, `careeronestop`, `census`, `bea`, and `fred` adapters are implemented** (`all` skips a keyed source with no env key). **IPEDS** is still reserved with no adapter. CareerOneStop must never store Bing geocodes. Credential Engine / CTDL is not ingested (registry account required); CareerOneStop certifications cover that gap.
 
-**8pm production path:** `HARDCALL_ALLOW_DEMO=false`, paste `006` + `007` on Supabase, run `npm run ingest -- --source all`. API keys are optional later — Phase A does not wait on api.data.gov / BLS / O\*NET Web Services accounts.
+**8pm production path:** `HARDCALL_ALLOW_DEMO=false`, paste `006` + `007` on Supabase, run `npm run ingest -- --source all`. Phase A does not wait on api.data.gov / BLS / O\*NET Web Services accounts. Phase B/C keys (`CAREERONESTOP_*`, `CENSUS_API_KEY`, `BEA_API_KEY`, optional `FRED_API_KEY`) belong on the Render ingest cron; `all` skips any of those that are unset.
 
 ---
 

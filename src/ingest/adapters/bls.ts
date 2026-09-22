@@ -18,7 +18,10 @@ export type WageRecord = {
   median_annual_wage: number | null;
   mean_hourly_wage: number | null;
   median_hourly_wage: number | null;
-} & BlsProvenance;
+  source: "bls" | "careeronestop";
+  source_url: string;
+  fetched_at: string;
+};
 
 const TITLE_STOP = new Set([
   "occupation",

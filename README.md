@@ -144,9 +144,11 @@ The migration creates `events` plus:
 
 Empty titles and empty-string optionals are illegal in the table. The API trims and turns blank `description` / `emoji` into `null` before insert.
 
-## Live ingest (keyless)
+## Live ingest
 
-Official bulk feeds — no API keys. **Phase A** is `scorecard` + `bls` + `onet`. The `apprenticeship_gov` CSV is Phase B in the source map but is keyless, so this worker already runs it. CareerOneStop / IPEDS / Census / BEA / FRED are reserved enums only (no adapters yet; COS must never store Bing geocodes).
+**Phase A** (`scorecard`, `bls` OEWS, `onet`) and the keyless `apprenticeship_gov` CSV need no API key. **Phase B/C** adapters run when their env vars are set. `bls_ep` is keyless (BLS Employment Projections Table 1.2) but bls.gov often returns HTTP 403, so pass `--file`. CareerOneStop never persists Bing geocodes. IPEDS stays reserved with no adapter yet.
+
+Credential Engine / CTDL is not a second credential vendor here. Registry publishing needs a Credential Registry account and API keys ([apps.credentialengine.org/accounts](https://apps.credentialengine.org/accounts/)). There is no keyless bulk download comparable to the Scorecard zip. CareerOneStop certifications (DOLETA + Minnesota DEED) cover that gap.
 
 ```bash
 npm run build
@@ -154,6 +156,7 @@ npm run ingest -- --source scorecard --dry-run
 npm run ingest -- --source all
 # or a local file:
 npx tsx src/ingest/cli.ts --source scorecard --file fixtures/scorecard_institutions_sample.csv --dry-run
+npx tsx src/ingest/cli.ts --source bls_ep --file fixtures/bls_ep_table_1_2_sample.csv --dry-run
 ```
 
 | `--source` | Phase | Feed |
@@ -161,10 +164,15 @@ npx tsx src/ingest/cli.ts --source scorecard --file fixtures/scorecard_instituti
 | `scorecard` | A | College Scorecard most-recent institution + field-of-study zips (institution / program COA + CIP outcomes — **not** per-course prices) |
 | `bls` | A | OEWS Table 1 / national tables |
 | `onet` | A | O*NET Occupation Data CSV |
-| `apprenticeship_gov` | B (keyless, shipped) | DOL OA Partner Sponsors CSV |
-| `all` | A+B CSV | the four above |
+| `apprenticeship_gov` | B (keyless) | DOL OA Partner Sponsors CSV |
+| `bls_ep` | A/B | BLS EP Table 1.2 (employment change and openings). `--file` accepts `.xlsx`, `.csv`, or `.htm` |
+| `careeronestop` | B | Licenses + certifications; optional wage compare. Needs `CAREERONESTOP_USER_ID` and `CAREERONESTOP_API_TOKEN` |
+| `census` | C | ACS 5-year income, population, labor force. Needs `CENSUS_API_KEY` |
+| `bea` | C | Regional GDP (`SAGDP2N`) and per capita personal income (`SAINC1`). Needs `BEA_API_KEY` (UserID) |
+| `fred` | C | Optional `UNRATE` and `CPIAUCSL`. Needs `FRED_API_KEY` |
+| `all` | A–C | Keyless feeds, plus any keyed adapter whose env vars are set. Missing keys are skipped with an error line, not invented rows |
 
-`--dry-run` parses and prints counts without `DATABASE_URL`. Production cron: `node dist/ingest/cli.js --source all` with `HARDCALL_ALLOW_DEMO=false`.
+`--dry-run` parses and prints counts without `DATABASE_URL`. Production cron: `node dist/ingest/cli.js --source all` with `HARDCALL_ALLOW_DEMO=false`. See `docs/DEPLOY.md` for Render env vars.
 
 ## Run
 

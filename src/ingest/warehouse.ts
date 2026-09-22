@@ -1,6 +1,7 @@
 import type { Pool } from "pg";
 import type { SponsorRecord } from "./adapters/apprenticeship";
 import type { WageRecord } from "./adapters/bls";
+import type { ProjectionRecord } from "./adapters/bls_ep";
 import type { OccupationRecord } from "./adapters/onet";
 import type { InstitutionRecord, ProgramRecord } from "./adapters/scorecard";
 import type { CreateEvent, CreateInsight, EventRow, InsightRow } from "../types";
@@ -39,6 +40,7 @@ export type Warehouse = {
   upsertSponsors(rows: SponsorRecord[]): Promise<number>;
   upsertOccupations(rows: OccupationRecord[]): Promise<number>;
   upsertWages(rows: WageRecord[]): Promise<number>;
+  upsertProjections(rows: ProjectionRecord[]): Promise<number>;
   upsertDerivedEvent(value: CreateEvent & { external_id: string }): Promise<EventRow>;
   upsertDerivedInsight(value: CreateInsight): Promise<InsightRow>;
 };
@@ -286,6 +288,45 @@ export function createPgWarehouse(pool: Pool): Warehouse {
              median_annual_wage = EXCLUDED.median_annual_wage,
              mean_hourly_wage = EXCLUDED.mean_hourly_wage,
              median_hourly_wage = EXCLUDED.median_hourly_wage,
+             source = EXCLUDED.source,
+             source_url = EXCLUDED.source_url,
+             fetched_at = EXCLUDED.fetched_at,
+             updated_at = now()`,
+          values
+        );
+      });
+    },
+
+    async upsertProjections(rows) {
+      return chunked(rows, async (slice) => {
+        const values: unknown[] = [];
+        const tuples = slice.map((row, i) => {
+          const b = i * 10;
+          values.push(
+            row.soc_code,
+            row.occupation_title,
+            row.period,
+            row.employment_base,
+            row.employment_proj,
+            row.change_percent,
+            row.typical_education,
+            row.source,
+            row.source_url,
+            row.fetched_at
+          );
+          return `($${b + 1},$${b + 2},$${b + 3},$${b + 4},$${b + 5},$${b + 6},$${b + 7},$${b + 8},$${b + 9},$${b + 10})`;
+        });
+        await pool.query(
+          `INSERT INTO projections (
+             soc_code, occupation_title, period, employment_base, employment_proj,
+             change_percent, typical_education, source, source_url, fetched_at
+           ) VALUES ${tuples.join(",")}
+           ON CONFLICT (occupation_title, period) DO UPDATE SET
+             soc_code = EXCLUDED.soc_code,
+             employment_base = EXCLUDED.employment_base,
+             employment_proj = EXCLUDED.employment_proj,
+             change_percent = EXCLUDED.change_percent,
+             typical_education = EXCLUDED.typical_education,
              source = EXCLUDED.source,
              source_url = EXCLUDED.source_url,
              fetched_at = EXCLUDED.fetched_at,

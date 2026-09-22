@@ -1,0 +1,12 @@
+{
+  "UNRATE": {
+    "observations": [
+      { "date": "2020-04-01", "value": "14.8" }
+    ]
+  },
+  "CPIAUCSL": {
+    "observations": [
+      { "date": "2020-04-01", "value": "256.032" }
+    ]
+  }
+}

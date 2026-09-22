@@ -1,0 +1,60 @@
+{
+  "income": {
+    "BEAAPI": {
+      "Results": {
+        "Data": [
+          {
+            "Code": "SAINC1-3",
+            "GeoFips": "00000",
+            "GeoName": "United States",
+            "TimePeriod": "2013",
+            "CL_UNIT": "Dollars",
+            "UNIT_MULT": "0",
+            "DataValue": "44402",
+            "NoteRef": "2"
+          },
+          {
+            "Code": "SAINC1-3",
+            "GeoFips": "01000",
+            "GeoName": "Alabama",
+            "TimePeriod": "2013",
+            "CL_UNIT": "Dollars",
+            "UNIT_MULT": "0",
+            "DataValue": "35,706",
+            "NoteRef": "2"
+          },
+          {
+            "Code": "SAINC1-3",
+            "GeoFips": "02000",
+            "GeoName": "Alaska *",
+            "TimePeriod": "2013",
+            "CL_UNIT": "Dollars",
+            "UNIT_MULT": "0",
+            "DataValue": "52252",
+            "NoteRef": "2 *"
+          },
+          {
+            "Code": "SAINC1-3",
+            "GeoFips": "04000",
+            "GeoName": "Arizona",
+            "TimePeriod": "2013",
+            "CL_UNIT": "Dollars",
+            "UNIT_MULT": "0",
+            "DataValue": "36918",
+            "NoteRef": "2"
+          },
+          {
+            "Code": "SAINC1-3",
+            "GeoFips": "97000",
+            "GeoName": "Rocky Mountain",
+            "TimePeriod": "2013",
+            "CL_UNIT": "Dollars",
+            "UNIT_MULT": "0",
+            "DataValue": "42336",
+            "NoteRef": "2"
+          }
+        ]
+      }
+    }
+  }
+}
