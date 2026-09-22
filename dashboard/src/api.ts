@@ -2,6 +2,18 @@ import { apiBase, LIST_FETCH_LIMIT } from "./config";
 import { formatApiError } from "./playground";
 import type { EventRow, InsightRow, StreamStatus } from "./types";
 
+export type WarehouseFeed = {
+  source: string;
+  label: string;
+  cadence: "daily" | "weekly" | "release";
+  cadence_label: string;
+  source_url: string;
+  last_fetched_at: string | null;
+  rows: number;
+  row_counts: Record<string, number>;
+  status: "ok" | "stale" | "error";
+};
+
 export type ApiMeta = {
   ok: boolean;
   allow_demo: boolean;
@@ -13,8 +25,13 @@ export type ApiMeta = {
     occupations: number;
     wage_observations: number;
     projections: number;
+    credentials?: number;
+    licenses?: number;
+    certifications?: number;
+    econ_indicators?: number;
     latest_fetched_at: string | null;
   };
+  feeds?: WarehouseFeed[];
 };
 
 export async function fetchMeta(base = apiBase()): Promise<ApiMeta> {
@@ -30,6 +47,7 @@ export async function fetchMeta(base = apiBase()): Promise<ApiMeta> {
     allow_demo: body.allow_demo !== false,
     live_sources: Array.isArray(body.live_sources) ? body.live_sources : [],
     warehouse: body.warehouse,
+    feeds: Array.isArray(body.feeds) ? body.feeds : undefined,
   };
 }
 

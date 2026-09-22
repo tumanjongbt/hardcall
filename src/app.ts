@@ -6,10 +6,19 @@ import {
   isDemoEventSource,
   isDemoInsightSource,
 } from "./demo_gate";
+import { redactUrl } from "./ingest/fetch_feed";
+import { INGEST_SOURCES, type IngestReport, type IngestSource } from "./ingest/run";
 import { EMPTY_WAREHOUSE_STATS, type Warehouse } from "./ingest/warehouse";
+import { ingestTokenMatches, presentedIngestToken } from "./ingest_auth";
 import { LIVE_SOURCES } from "./live_sources";
 import { createSseHub, type SseHub } from "./sse_hub";
 import type { ListEventsQuery, Store } from "./types";
+import {
+  buildFeedRows,
+  parseWarehouseListQuery,
+  WAREHOUSE_RESOURCES,
+  warehouseListBody,
+} from "./warehouse_query";
 
 const SSE_HEARTBEAT_MS = 15_000;
 const SSE_RETRY_MS = 5_000;
@@ -86,6 +95,9 @@ export function createApp(
     heartbeatMs?: number;
     allowDemo?: boolean;
     warehouse?: Warehouse;
+    /** `HARDCALL_INGEST_TOKEN`. Null or empty keeps POST /api/ingest closed. */
+    ingestToken?: string | null;
+    runIngest?: (source: IngestSource) => Promise<IngestReport>;
   }
 ): FastifyInstance {
   const app = Fastify({
@@ -108,7 +120,10 @@ export function createApp(
   app.addHook("onRequest", async (_request, reply) => {
     reply.header("Access-Control-Allow-Origin", "*");
     reply.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-    reply.header("Access-Control-Allow-Headers", "Content-Type");
+    reply.header(
+      "Access-Control-Allow-Headers",
+      "Content-Type, Authorization, X-Hardcall-Ingest-Token"
+    );
   });
 
   app.options("*", async (_request, reply) => reply.code(204).send());
@@ -124,12 +139,112 @@ export function createApp(
         request.log.error(err);
       }
     }
+    let feeds = buildFeedRows({});
+    if (opts?.warehouse) {
+      try {
+        feeds = await opts.warehouse.feeds();
+      } catch (err) {
+        request.log.error(err);
+      }
+    }
     return reply.send({
       ok: true,
       allow_demo: allowDemo,
       live_sources: [...LIVE_SOURCES],
       warehouse,
+      feeds,
     });
+  });
+
+  app.get("/api/warehouse", async (request, reply) => {
+    if (!opts?.warehouse) {
+      return reply.send({ ok: true, warehouse: EMPTY_WAREHOUSE_STATS });
+    }
+    try {
+      return reply.send({ ok: true, warehouse: await opts.warehouse.stats() });
+    } catch (err) {
+      request.log.error(err);
+      return reply.code(500).send({ error: "persist_failed" });
+    }
+  });
+
+  app.get("/api/feeds", async (request, reply) => {
+    if (!opts?.warehouse) {
+      return reply.send({ feeds: buildFeedRows({}) });
+    }
+    try {
+      return reply.send({ feeds: await opts.warehouse.feeds() });
+    } catch (err) {
+      request.log.error(err);
+      return reply.code(500).send({ error: "persist_failed" });
+    }
+  });
+
+  for (const resource of WAREHOUSE_RESOURCES) {
+    const path = resource === "econ" ? "/api/econ" : `/api/${resource}`;
+    app.get(path, async (request, reply) => {
+      const parsed = parseWarehouseListQuery(request.query);
+      if (!parsed.ok) {
+        return reply.code(400).send({
+          error: "validation_failed",
+          details: parsed.details,
+        });
+      }
+      if (!opts?.warehouse) {
+        return reply.send(
+          warehouseListBody(resource, {
+            rows: [],
+            limit: parsed.value.limit,
+            offset: parsed.value.offset,
+            total: 0,
+          })
+        );
+      }
+      try {
+        const page = await opts.warehouse.list(resource, parsed.value);
+        return reply.send(warehouseListBody(resource, page));
+      } catch (err) {
+        request.log.error(err);
+        return reply.code(500).send({ error: "persist_failed" });
+      }
+    });
+  }
+
+  const ingestSources = new Set<string>(INGEST_SOURCES);
+
+  app.post("/api/ingest/:source", async (request, reply) => {
+    const expected = opts?.ingestToken?.trim() || null;
+    const presented = presentedIngestToken(request.headers);
+    if (!ingestTokenMatches(presented, expected)) {
+      return reply.code(401).send({ error: "unauthorized" });
+    }
+    const source = (request.params as { source?: string }).source ?? "";
+    if (!ingestSources.has(source)) {
+      return reply.code(400).send({
+        error: "validation_failed",
+        details: [{ field: "source", rule: "enum" }],
+      });
+    }
+    if (!opts?.runIngest) {
+      return reply.code(503).send({ error: "ingest_unavailable" });
+    }
+    try {
+      const report = await opts.runIngest(source as IngestSource);
+      return reply.code(200).send({
+        ok: true,
+        report: {
+          ...report,
+          sources: report.sources.map((row) => ({
+            ...row,
+            source_url: redactUrl(row.source_url),
+          })),
+        },
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "ingest_failed";
+      request.log.error({ err: redactUrl(message).slice(0, 400) }, "ingest failed");
+      return reply.code(500).send({ error: "ingest_failed" });
+    }
   });
 
   app.get("/api/events", async (request, reply) => {

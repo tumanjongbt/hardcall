@@ -6,9 +6,10 @@
  * keyless too (xlsx/htm); bls.gov often 403s, so `--file` is the bypass.
  * Phase B/C APIs (CareerOneStop, Census, BEA, FRED) run only when their env
  * keys are set. CareerOneStop must never persist Bing geocodes.
- * Credential Engine / CTDL is not wired: registry access needs an account and
- * API keys (https://apps.credentialengine.org/accounts/). CareerOneStop
- * certifications cover that credential gap without a second vendor.
+ * Credential Engine / CTDL is not pulled here: registry access needs an account
+ * and API keys (https://apps.credentialengine.org/accounts/). GET /api/credentials
+ * reads rows already in the warehouse. CareerOneStop certifications are the
+ * live pull for that credential gap.
  */
 
 export const APPRENTICESHIP_CSV_URL =

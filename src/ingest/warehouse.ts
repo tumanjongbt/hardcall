@@ -2,9 +2,20 @@ import type { Pool } from "pg";
 import type { SponsorRecord } from "./adapters/apprenticeship";
 import type { WageRecord } from "./adapters/bls";
 import type { ProjectionRecord } from "./adapters/bls_ep";
+import type { CertificationRecord, LicenseRecord } from "./adapters/careeronestop";
 import type { OccupationRecord } from "./adapters/onet";
 import type { InstitutionRecord, ProgramRecord } from "./adapters/scorecard";
 import type { CreateEvent, CreateInsight, EventRow, InsightRow } from "../types";
+import type { FeedRow, WarehouseListQuery, WarehousePage, WarehouseResource } from "../warehouse_query";
+import {
+  readWarehouseFeeds,
+  readWarehouseList,
+  readWarehouseStats,
+  upsertCertificationRows,
+  upsertEconRows,
+  upsertLicenseRows,
+  type EconIndicatorRecord,
+} from "./warehouse_pg";
 
 export type WarehouseStats = {
   institutions: number;
@@ -13,6 +24,10 @@ export type WarehouseStats = {
   occupations: number;
   wage_observations: number;
   projections: number;
+  credentials: number;
+  licenses: number;
+  certifications: number;
+  econ_indicators: number;
   latest_fetched_at: string | null;
 };
 
@@ -33,58 +48,49 @@ function toIsoOrNull(value: Date | string | null | undefined): string | null {
   return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
 }
 
+export type { EconIndicatorRecord };
+
 export type Warehouse = {
   stats(): Promise<WarehouseStats>;
+  feeds(): Promise<FeedRow[]>;
+  list(resource: WarehouseResource, query: WarehouseListQuery): Promise<WarehousePage>;
   upsertInstitutions(rows: InstitutionRecord[]): Promise<number>;
   upsertPrograms(rows: ProgramRecord[]): Promise<number>;
   upsertSponsors(rows: SponsorRecord[]): Promise<number>;
   upsertOccupations(rows: OccupationRecord[]): Promise<number>;
   upsertWages(rows: WageRecord[]): Promise<number>;
   upsertProjections(rows: ProjectionRecord[]): Promise<number>;
+  upsertLicenses(rows: LicenseRecord[]): Promise<number>;
+  upsertCertifications(rows: CertificationRecord[]): Promise<number>;
+  upsertEcon(rows: EconIndicatorRecord[]): Promise<number>;
   upsertDerivedEvent(value: CreateEvent & { external_id: string }): Promise<EventRow>;
   upsertDerivedInsight(value: CreateInsight): Promise<InsightRow>;
 };
 
 export function createPgWarehouse(pool: Pool): Warehouse {
   return {
-    async stats(): Promise<WarehouseStats> {
-      const { rows } = await pool.query<{
-        institutions: string;
-        programs: string;
-        apprenticeship_sponsors: string;
-        occupations: string;
-        wage_observations: string;
-        projections: string;
-        latest_fetched_at: Date | string | null;
-      }>(`
-        SELECT
-          (SELECT count(*)::text FROM institutions) AS institutions,
-          (SELECT count(*)::text FROM programs) AS programs,
-          (SELECT count(*)::text FROM apprenticeship_sponsors) AS apprenticeship_sponsors,
-          (SELECT count(*)::text FROM occupations) AS occupations,
-          (SELECT count(*)::text FROM wage_observations) AS wage_observations,
-          (SELECT count(*)::text FROM projections) AS projections,
-          (
-            SELECT max(fetched_at) FROM (
-              SELECT fetched_at FROM institutions
-              UNION ALL SELECT fetched_at FROM programs
-              UNION ALL SELECT fetched_at FROM apprenticeship_sponsors
-              UNION ALL SELECT fetched_at FROM occupations
-              UNION ALL SELECT fetched_at FROM wage_observations
-              UNION ALL SELECT fetched_at FROM projections
-            ) t
-          ) AS latest_fetched_at
-      `);
-      const row = rows[0];
-      return {
-        institutions: Number(row?.institutions ?? 0),
-        programs: Number(row?.programs ?? 0),
-        apprenticeship_sponsors: Number(row?.apprenticeship_sponsors ?? 0),
-        occupations: Number(row?.occupations ?? 0),
-        wage_observations: Number(row?.wage_observations ?? 0),
-        projections: Number(row?.projections ?? 0),
-        latest_fetched_at: toIsoOrNull(row?.latest_fetched_at ?? null),
-      };
+    stats() {
+      return readWarehouseStats(pool);
+    },
+
+    feeds() {
+      return readWarehouseFeeds(pool);
+    },
+
+    list(resource, query) {
+      return readWarehouseList(pool, resource, query);
+    },
+
+    upsertLicenses(rows) {
+      return upsertLicenseRows(pool, rows);
+    },
+
+    upsertCertifications(rows) {
+      return upsertCertificationRows(pool, rows);
+    },
+
+    upsertEcon(rows) {
+      return upsertEconRows(pool, rows);
     },
 
     async upsertInstitutions(rows) {
@@ -432,5 +438,9 @@ export const EMPTY_WAREHOUSE_STATS: WarehouseStats = {
   occupations: 0,
   wage_observations: 0,
   projections: 0,
+  credentials: 0,
+  licenses: 0,
+  certifications: 0,
+  econ_indicators: 0,
   latest_fetched_at: null,
 };

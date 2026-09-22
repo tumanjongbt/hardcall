@@ -2,7 +2,9 @@ import "dotenv/config";
 import { createApp } from "./app";
 import { createPgStore, createPool } from "./db";
 import { allowDemoFromEnv } from "./demo_gate";
+import { runIngest } from "./ingest/run";
 import { createPgWarehouse } from "./ingest/warehouse";
+import { ingestTokenFromEnv } from "./ingest_auth";
 import {
   applyPendingMigrations,
   ensureInsightsProvenanceColumns,
@@ -19,10 +21,13 @@ const host = process.env.HOST || "0.0.0.0";
 const allowDemo = allowDemoFromEnv();
 
 const pool = createPool(databaseUrl);
+const warehouse = createPgWarehouse(pool);
 const app = createApp(createPgStore(pool), {
   logger: true,
   allowDemo,
-  warehouse: createPgWarehouse(pool),
+  warehouse,
+  ingestToken: ingestTokenFromEnv(),
+  runIngest: (source) => runIngest({ source, warehouse }),
 });
 
 async function shutdown(signal: string) {

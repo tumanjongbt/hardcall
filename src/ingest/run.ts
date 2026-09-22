@@ -18,6 +18,7 @@ import {
   type ProgramRecord,
 } from "./adapters/scorecard";
 import { CREDENTIAL_HELP, keyedAdapterEnabled } from "./credentials";
+import { econFromAcs, econFromBea, econFromFred } from "./econ_rows";
 import {
   deriveFromAcs,
   deriveFromBea,
@@ -311,7 +312,16 @@ export async function ingestCareerOneStop(
       })
     : await fetchCareerOneStop(process.env, { fetched_at: fetchedAt }, { limit: opts.limit });
   if (!opts.dryRun && opts.warehouse) {
-    if (bundle.wages.length > 0) await opts.warehouse.upsertWages(bundle.wages);
+    const warehouse = opts.warehouse;
+    if (bundle.wages.length > 0) await warehouse.upsertWages(bundle.wages);
+    if (bundle.licenses.length > 0) {
+      await upsertWarehouse("licenses", () => warehouse.upsertLicenses(bundle.licenses));
+    }
+    if (bundle.certifications.length > 0) {
+      await upsertWarehouse("certifications", () =>
+        warehouse.upsertCertifications(bundle.certifications)
+      );
+    }
   }
   return {
     bundle,
@@ -337,6 +347,13 @@ export async function ingestCensus(
     ? parseAcsFile(await readJsonFile(opts.file), fetchedAt)
     : await fetchAcs(process.env, fetchedAt);
   const places = opts.limit ? extract.places.slice(0, opts.limit) : extract.places;
+  if (!opts.dryRun && opts.warehouse) {
+    const warehouse = opts.warehouse;
+    const indicators = econFromAcs(places);
+    if (indicators.length > 0) {
+      await upsertWarehouse("econ_indicators", () => warehouse.upsertEcon(indicators));
+    }
+  }
   return {
     places,
     report: {
@@ -358,6 +375,13 @@ export async function ingestBea(opts: IngestOptions): Promise<{
   const extract = opts.file
     ? parseBeaFile(await readJsonFile(opts.file), fetchedAt)
     : await fetchBea(process.env, fetchedAt);
+  if (!opts.dryRun && opts.warehouse) {
+    const warehouse = opts.warehouse;
+    const indicators = econFromBea([...extract.gdp, ...extract.income]);
+    if (indicators.length > 0) {
+      await upsertWarehouse("econ_indicators", () => warehouse.upsertEcon(indicators));
+    }
+  }
   return {
     gdp: extract.gdp,
     income: extract.income,
@@ -378,6 +402,13 @@ export async function ingestFred(
   const points = opts.file
     ? parseFredFile(await readJsonFile(opts.file), fetchedAt)
     : await fetchFred(process.env, fetchedAt);
+  if (!opts.dryRun && opts.warehouse) {
+    const warehouse = opts.warehouse;
+    const indicators = econFromFred(points);
+    if (indicators.length > 0) {
+      await upsertWarehouse("econ_indicators", () => warehouse.upsertEcon(indicators));
+    }
+  }
   return {
     points,
     report: {
@@ -387,6 +418,16 @@ export async function ingestFred(
       rows: points.length,
     },
   };
+}
+
+/** A drifted live table must not abort the rest of that source's ingest. */
+async function upsertWarehouse(label: string, fn: () => Promise<unknown>): Promise<void> {
+  try {
+    await fn();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`${label} warehouse upsert skipped: ${message}`);
+  }
 }
 
 function skippedReport(source: string, sourceUrl: string, missingCredentials: boolean): SourceReport {
