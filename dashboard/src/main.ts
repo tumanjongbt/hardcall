@@ -1,11 +1,12 @@
 import { fetchEvents, fetchInsights, fetchMeta, postEvent, postInsight, subscribeEvents } from "./api";
-import { DECISION_LINE } from "./charts/copy";
+import { renderDecisionCharts, teardownDecisionCharts } from "./charts/decisionCharts";
 import { renderCharts, teardownCharts } from "./charts/renderCharts";
 import { renderChartFilters } from "./charts/controls";
 import { channelDistribution, eventsInRange } from "./charts/transforms";
 import { apiBase, INSIGHTS_POLL_MS, PLAYGROUND_TOAST_MS, SEARCH_DEBOUNCE_MS } from "./config";
 import { debounce } from "./debounce";
-import { findInsight } from "./insights";
+import { lensDecision, renderFeedStrip, renderLensBar, renderPaths } from "./decisionRender";
+import { findInsight, sortInsights } from "./insights";
 import {
   buildEventPayload,
   createdEventSummary,
@@ -20,8 +21,8 @@ import {
   resetPlaygroundForm,
   sampleStatusLabel,
 } from "./playgroundSamples";
-import { provenanceCounts } from "./provenance";
-import { filterByLens, filterEvents, paginate } from "./query";
+import { isLiveEventSource, provenanceCounts } from "./provenance";
+import { filterEvents, paginate } from "./query";
 import {
   renderChannels,
   renderFeed,
@@ -48,9 +49,28 @@ import {
   parseSeedJson,
   type SeedProgress,
 } from "./seed";
-import type { AudienceLens, ChartRange, DashboardTab, EventRow, ForecastHorizon, InsightRow, StreamStatus, ViewState } from "./types";
-import { hrefForState, parseViewState } from "./url-state";
+import type { AudienceLens, ChartRange, DashboardTab, EventRow, ForecastHorizon, InsightRow, Outlook, StreamStatus, ViewState } from "./types";
+import { hrefForState, parseCip, parseState, parseViewState } from "./url-state";
+import {
+  buildFeedStrip,
+  buildPaths,
+  decisionTiles,
+  emptyWarehouse,
+  loadWarehouse,
+  mergeInsightRows,
+  tilesForLens,
+  tilesToInsights,
+  visibleApiInsights,
+  warehouseGaps,
+  type DecisionFilters,
+  type WarehouseSnapshot,
+} from "./warehouse";
 
+const lensEl = must("#lens-switch");
+const lensDecisionEl = must("#lens-decision");
+const feedsEl = must("#feeds");
+const pathsEl = must("#paths");
+const decisionChartsEl = must("#decision-charts");
 const tabsEl = must("#tabs");
 const heroEl = must("#hero");
 const eventsViewEl = must("#events-view");
@@ -116,6 +136,8 @@ let seedProgress: SeedProgress = emptySeedProgress();
 let adminToastTimer: number | null = null;
 let allowDemo = import.meta.env.VITE_HARDCALL_ALLOW_DEMO !== "false";
 let warehouseFetchedAt: string | null = null;
+let warehouse: WarehouseSnapshot = emptyWarehouse();
+let warehouseLoading = true;
 
 function must<T extends HTMLElement = HTMLElement>(selector: string): T {
   const node = document.querySelector<T>(selector);
@@ -123,9 +145,19 @@ function must<T extends HTMLElement = HTMLElement>(selector: string): T {
   return node;
 }
 
+function decisionFilters(): DecisionFilters {
+  return {
+    channel: view.channel,
+    state: view.state,
+    cip: view.cip,
+    outlook: view.outlook,
+    lens: view.lens,
+  };
+}
+
 function currentModel() {
-  const filtered = filterEvents(allEvents, view.channel, view.q);
-  const chartFiltered = filterByLens(filtered, view.lens);
+  const filtered = filterEvents(allEvents, view.channel, view.q, view.lens);
+  const chartFiltered = filtered;
   const page = paginate(filtered, view.page, view.perPage);
   if (page.page !== view.page) {
     view = { ...view, page: page.page };
@@ -150,12 +182,23 @@ function currentModel() {
 }
 
 function insightsModel() {
+  const filters = decisionFilters();
+  const apiRows = visibleApiInsights(insights, allowDemo);
+  const derived = warehouseLoading
+    ? []
+    : tilesToInsights(tilesForLens(decisionTiles(warehouse, filters), view.lens));
+  const merged = sortInsights(mergeInsightRows(apiRows, derived));
+  const demoNote =
+    allowDemo && apiRows.some((row) => !isLiveEventSource(row.source))
+      ? "Demo KPI cards are admin seed, playground, or CLI values. They are not production warehouse data."
+      : null;
   return {
-    insights,
-    loading: insightsLoading,
+    insights: merged,
+    loading: (insightsLoading || warehouseLoading) && merged.length === 0,
     loadError: insightsError,
     lastLoadedAt: insightsLoadedAt,
     openId: view.tab === "insights" ? view.insight : null,
+    demoNote,
   };
 }
 
@@ -173,7 +216,30 @@ function paint(): void {
   chartsViewEl.hidden = model.view.tab !== "charts";
   chartsHeadingEl.hidden = model.view.tab !== "charts";
   heroEl.hidden = model.view.tab !== "events";
-  chartsDecisionEl.textContent = DECISION_LINE;
+  chartsDecisionEl.textContent = lensDecision(view);
+  lensDecisionEl.textContent = lensDecision(view);
+  renderLensBar(lensEl, view, {
+    onLens: setLens,
+    onState: (value) => commitState(value),
+    onCip: (value) => commitCip(value),
+    onOutlook: setOutlook,
+  });
+  renderFeedStrip(
+    feedsEl,
+    warehouseLoading
+      ? null
+      : buildFeedStrip(warehouse, { latestFetchedAt: warehouseFetchedAt, events: allEvents }),
+    warehouseLoading
+  );
+  const showPaths = view.tab === "events" || view.tab === "insights" || view.tab === "charts";
+  pathsEl.hidden = !showPaths;
+  if (showPaths) {
+    renderPaths(pathsEl, {
+      loading: warehouseLoading,
+      rows: warehouseLoading ? [] : buildPaths(warehouse, decisionFilters()),
+      gaps: warehouseLoading ? [] : warehouseGaps(warehouse),
+    });
+  }
   insightsViewEl.hidden = model.view.tab !== "insights";
   playgroundViewEl.hidden = model.view.tab !== "playground";
   adminViewEl.hidden = model.view.tab !== "admin";
@@ -208,12 +274,16 @@ function paint(): void {
       chartFiltersEl,
       model.view,
       {
-        onLens: setLens,
         onRange: setRange,
         onToggleCompare: toggleCompare,
       },
       { volumes: model.loading ? undefined : volumes }
     );
+    renderDecisionCharts(decisionChartsEl, {
+      snapshot: warehouse,
+      filters: decisionFilters(),
+      loading: warehouseLoading,
+    });
     renderCharts(
       chartsEl,
       {
@@ -227,12 +297,14 @@ function paint(): void {
     );
   } else {
     teardownCharts(chartsEl);
+    teardownDecisionCharts(decisionChartsEl);
   }
-  renderInsights(insightsEl, insightsModel(), toggleInsight);
-  renderInsightsMeta(insightsMetaEl, insightsModel());
+  const insightView = insightsModel();
+  renderInsights(insightsEl, insightView, toggleInsight);
+  renderInsightsMeta(insightsMetaEl, insightView);
   renderInsightDetail(
     insightDetailEl,
-    view.tab === "insights" ? findInsight(insights, view.insight) : null,
+    view.tab === "insights" ? findInsight(insightView.insights, view.insight) : null,
     closeInsight
   );
   if (model.view.tab === "playground") paintPlayground();
@@ -285,6 +357,23 @@ function setLens(lens: AudienceLens | null): void {
   if (view.lens === lens) return;
   pushView({ ...view, lens, page: 1 });
 }
+
+function setOutlook(outlook: Outlook): void {
+  if (view.outlook === outlook) return;
+  pushView({ ...view, outlook });
+}
+
+const commitState = debounce((value: string) => {
+  const state = parseState(value);
+  if (state === view.state) return;
+  pushView({ ...view, state, page: 1 });
+}, SEARCH_DEBOUNCE_MS);
+
+const commitCip = debounce((value: string) => {
+  const cip = parseCip(value);
+  if (cip === view.cip) return;
+  pushView({ ...view, cip, page: 1 });
+}, SEARCH_DEBOUNCE_MS);
 
 function setRange(range: ChartRange): void {
   if (view.range === range) return;
@@ -646,6 +735,8 @@ document.addEventListener("keydown", (event) => {
 
 window.addEventListener("popstate", () => {
   commitSearch.cancel();
+  commitState.cancel();
+  commitCip.cancel();
   view = parseViewState(location.search);
   searchEl.value = view.q;
   paint();
@@ -702,7 +793,11 @@ async function loadInsights(): Promise<void> {
   try {
     insights = await fetchInsights();
     insightsLoadedAt = new Date().toISOString();
-    if (view.insight && !findInsight(insights, view.insight)) {
+    if (
+      view.insight &&
+      !view.insight.startsWith("wh:") &&
+      !findInsight(insights, view.insight)
+    ) {
       view = { ...view, insight: null };
       history.replaceState(view, "", hrefForState(view, location.pathname));
     }
@@ -711,6 +806,19 @@ async function loadInsights(): Promise<void> {
     insightsError = errorMessage(err, "insights");
   } finally {
     insightsLoading = false;
+    paint();
+  }
+}
+
+async function loadWarehouseRows(): Promise<void> {
+  warehouseLoading = true;
+  paint();
+  try {
+    warehouse = await loadWarehouse(apiBase());
+  } catch {
+    warehouse = emptyWarehouse();
+  } finally {
+    warehouseLoading = false;
     paint();
   }
 }
@@ -734,6 +842,7 @@ paint();
 void loadMeta();
 void loadHistory();
 void loadInsights();
+void loadWarehouseRows();
 window.setInterval(() => {
   void loadInsights();
 }, INSIGHTS_POLL_MS);

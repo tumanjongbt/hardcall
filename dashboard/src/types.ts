@@ -67,6 +67,8 @@ export type ChartRange = 7 | 14 | 30 | 90;
 
 export type ForecastHorizon = 14 | 30;
 
+export type Outlook = "grow" | "decline" | null;
+
 export type ViewState = {
   tab: DashboardTab;
   page: number;
@@ -74,7 +76,7 @@ export type ViewState = {
   channel: string | null;
   q: string;
   insight: string | null;
-  /** Charts audience lens; `null` means All stakeholders. */
+  /** Audience lens; `null` means All stakeholders. */
   lens: AudienceLens | null;
   /** Charts lookback window in UTC days (includes 90-day history). */
   range: ChartRange;
@@ -82,6 +84,12 @@ export type ViewState = {
   forecast: ForecastHorizon;
   /** Up to two channel ids for path compare. */
   compare: string[];
+  /** State name or postal code. Narrows warehouse rows that carry a state field. */
+  state: string | null;
+  /** CIP code or program title fragment. */
+  cip: string | null;
+  /** Grow/decline cut for projection charts. `null` lets the lens choose a default. */
+  outlook: Outlook;
 };
 
 export type StreamStatus = "connecting" | "live" | "down";

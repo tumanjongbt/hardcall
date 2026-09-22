@@ -27,6 +27,9 @@ export function defaultViewState(): ViewState {
     range: DEFAULT_RANGE,
     forecast: DEFAULT_FORECAST,
     compare: [...DEFAULT_COMPARE],
+    state: null,
+    cip: null,
+    outlook: null,
   };
 }
 
@@ -65,6 +68,24 @@ export function parseLens(value: string | null): AudienceLens | null {
   if (raw === "high_school_students" || raw === "college_students") return "students";
   if (raw === "career_counselors") return "counselors";
   if (raw === "workforce_training_managers") return "workforce";
+  return null;
+}
+
+export function parseState(value: string | null): string | null {
+  if (!value) return null;
+  const trimmed = value.trim().replace(/[^\p{L}\s.-]/gu, "").slice(0, 40);
+  if (!trimmed) return null;
+  return trimmed.length === 2 ? trimmed.toUpperCase() : trimmed;
+}
+
+export function parseCip(value: string | null): string | null {
+  if (!value) return null;
+  const trimmed = value.trim().replace(/\s+/g, " ").slice(0, 80);
+  return trimmed || null;
+}
+
+export function parseOutlook(value: string | null): ViewState["outlook"] {
+  if (value === "grow" || value === "decline") return value;
   return null;
 }
 
@@ -116,6 +137,9 @@ export function parseViewState(search: string): ViewState {
     range: parseRange(params.get("range")),
     forecast: parseForecast(params.get("forecast")),
     compare: parseCompare(params.get("compare")),
+    state: parseState(params.get("state")),
+    cip: parseCip(params.get("cip")),
+    outlook: parseOutlook(params.get("outlook")),
   };
 }
 
@@ -143,6 +167,11 @@ export function serializeViewState(state: ViewState): string {
   } else if (!comparesAreDefault(compare)) {
     params.set("compare", compare.join(","));
   }
+  const stateFilter = (state.state ?? "").trim();
+  if (stateFilter) params.set("state", stateFilter);
+  const cip = (state.cip ?? "").trim();
+  if (cip) params.set("cip", cip);
+  if (state.outlook) params.set("outlook", state.outlook);
   return params.toString();
 }
 

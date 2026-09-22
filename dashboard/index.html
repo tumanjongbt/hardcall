@@ -41,6 +41,9 @@
       <nav id="tabs" class="tabs" role="tablist" aria-label="Dashboard views"></nav>
 
       <main id="main" tabindex="-1">
+        <section id="lens-switch" class="panel lens-panel" aria-label="Stakeholder lens"></section>
+        <p id="lens-decision" class="lens-decision"></p>
+        <section id="feeds" class="feeds" aria-label="Live sources"></section>
         <section
           id="hero"
           class="hero"
@@ -93,6 +96,8 @@
           </div>
         </section>
 
+        <section id="paths" class="paths panel" aria-label="Paths in this pull"></section>
+
         <section
           id="events-view"
           role="tabpanel"
@@ -119,11 +124,16 @@
           aria-labelledby="tab-charts"
           hidden
         >
+          <section id="decision-charts" aria-label="Warehouse decision charts"></section>
+          <h2 class="section-kicker">Event volume</h2>
+          <p class="section-note">
+            These charts count events in the feed. The forward band is telemetry from recent volume, not advice.
+          </p>
           <section id="chart-filters" class="panel" aria-label="Chart decision filters"></section>
           <section id="charts" aria-label="Event charts"></section>
           <p class="footnote">
-            Charts aggregate the event store. Live badges mark official adapter rows
-            (Scorecard, BLS, O*NET, apprenticeship.gov). Forecast is telemetry, not a path recommendation.
+            Warehouse charts use only fields the API returned. Event-volume charts follow the event store.
+            Live badges mark official adapter rows. The forecast band is not a recommendation.
           </p>
         </section>
 
@@ -138,9 +148,10 @@
           </div>
           <section id="insights" aria-label="Market insights" aria-live="polite"></section>
           <p class="footnote">
-            KPI cards refresh every 15 seconds. Live badges are derived from official
-            warehouse tables. <strong>Demo KPI</strong> means a seed value — hidden in production
-            when <code>HARDCALL_ALLOW_DEMO=false</code>. Click a card for the analysis.
+            KPI cards refresh every 15 seconds. Live badges and source links are the
+            fields the API sent. <strong>Demo KPI</strong> means admin seed, playground, or CLI —
+            hidden when demo mode is off. Click a card for the analysis. Last pulled is the
+            ingest time, not a tick-by-tick quote.
           </p>
         </section>
 
@@ -299,8 +310,8 @@
           <header class="charts-heading">
             <h1 class="charts-heading__title">Admin</h1>
             <p class="charts-heading__decision">
-              Seed synthetic career trends from a JSON file. Parsed in this browser,
-              then posted one-by-one.
+              Admin seed is not production data. JSON parsed in this browser is posted
+              as synthetic rows, one by one, and those KPIs hide when demo mode is off.
             </p>
           </header>
           <section class="panel" aria-labelledby="admin-drop-title">
@@ -309,7 +320,9 @@
               Drop or choose a <code>.json</code> file. Expected shape:
               <code>{"events":[{"channel":"trade","title":"…","minutes_ago":120}],"insights":[{"title":"…","value":"…"}]}</code>.
               <code>minutes_ago</code> becomes <code>created_at</code> and is stripped before
-              POST. Default <code>source</code> is <code>synthetic</code>.
+              POST.               Default <code>source</code> is <code>synthetic</code>.
+              This file does not load College Scorecard, OEWS, BLS EP, O*NET, apprenticeship.gov,
+              CareerOneStop, Census, BEA, FRED, or Credential Engine.
               Example: <a href="/seed-example.json">seed-example.json</a>.
             </p>
             <div id="admin-drop" class="dropzone">
@@ -330,7 +343,7 @@
           <div id="admin-toast" class="toast" hidden role="status" aria-live="polite"></div>
           <p class="footnote">
             Sequential <code>POST /api/events</code> then <code>POST /api/insight</code>.
-            Charts and Events reload when ingest finishes.
+            Seeded rows are labeled Demo KPI. They are not a substitute for the warehouse pull.
           </p>
         </section>
       </main>

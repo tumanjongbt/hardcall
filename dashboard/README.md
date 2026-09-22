@@ -1,6 +1,6 @@
 # Hardcall dashboard
 
-Local feed for career-market events, a **Charts** tab for the same telemetry, a **Market Insights** KPI tab, a **Playground** tab that posts mock scraper payloads to `POST /api/events`, and an **Admin** tab (`?tab=admin` or `?tab=seed`) that ingests a local JSON seed file. Logic lives in `src/*.ts` (Playground payload + highlighter in `src/playground.ts`; seed parse/post in `src/seed.ts`); chart bucketing lives in `src/charts/transforms.ts`; Chart.js lifecycle lives in `src/charts/renderCharts.ts`; presentation lives in `src/styles.css` and the markup in `index.html`.
+Stakeholder dashboard for live warehouse rows (cost, wages, projections, credentials, econ) plus the career-event feed. **Charts** keeps Chart.js. **Market Insights** shows API KPIs. **Playground** posts mock scraper payloads to `POST /api/events`. **Admin** (`?tab=admin` or `?tab=seed`) ingests a local JSON seed and is labeled as not production data. Logic lives in `src/*.ts` (Playground payload + highlighter in `src/playground.ts`; seed parse/post in `src/seed.ts`); chart bucketing lives in `src/charts/transforms.ts`; Chart.js lifecycle lives in `src/charts/renderCharts.ts`; presentation lives in `src/styles.css` and the markup in `index.html`.
 
 Brand (v2 locked — see `BRAND.md`): void `#05010A`, nebula `#5B2CFF`, corona `#FFB020`, accretion `#FF4FBF`, signal `#2EE6A6`, paper `#F5F2EA`, mute `#8B8794`. Display **Unbounded ExtraBold**, UI **DM Sans**, data **IBM Plex Mono**. Masthead lockup: celestial-map mark (`public/logo.png`) + HARDCALL + corona tagline *the call that shapes your orbit.* Events hero: `public/banner-celestial.png`. Do **not** ship event-horizon, supernova, protostar, or the old geometric amber H. Product name stays out of API routes and status enums.
 
@@ -25,7 +25,7 @@ npm run build
 
 `VITE_EVENTS_API_URL` — API **origin only** (scheme + host[:port]). Paths, query strings, and non-http(s) values are ignored and the default origin is used. Default: `https://hardcall-api.onrender.com`.
 
-This value is **public**. Vite inlines every `VITE_*` key into the static bundle. Do not put tokens, passwords, or `DATABASE_URL` here. The browser only fetches that configured origin (`/api/events`, `/api/events/stream`, `/api/insights`, `POST /api/events`, `POST /api/insight`).
+This value is **public**. Vite inlines every `VITE_*` key into the static bundle. Do not put tokens, passwords, or `DATABASE_URL` here. The browser fetches that origin for `/api/events`, `/api/events/stream`, `/api/insights`, `/api/meta`, and, when deployed, `/api/institutions`, `/api/wages`, `/api/projections`, `/api/credentials`, `/api/licenses`, `/api/certifications`, `/api/econ`, and `/api/feeds`. A 404 on a warehouse route leaves that card empty. It does not invent rows. `POST /api/events` and `POST /api/insight` stay on the demo tabs.
 
 The API answers CORS with `Access-Control-Allow-Origin: *` (plus `GET,POST,OPTIONS` and `Content-Type`) so a local Vite origin or a later hosted dashboard can read and post. Tighten that header when ingest auth lands.
 
@@ -39,7 +39,7 @@ VITE_EVENTS_API_URL=http://127.0.0.1:3000 npm run dev
 
 Copy `.env.example` to `.env` if you want the value sticky.
 
-If history 404s, the Render web service has not picked up `GET /api/events` yet. SSE already exists on the live API. Point the dashboard at a local API, or wait for redeploy.
+If history 404s, the Render web service has not picked up `GET /api/events` yet. SSE already exists on the live API. Point the dashboard at a local API, or wait for redeploy. Warehouse routes can 404 independently: the Feeds strip still lists Scorecard, OEWS, BLS EP, O*NET, apprenticeship.gov, CareerOneStop, Census, BEA, FRED, and Credential Engine, and a Live badge appears only when that dataset has `fetched_at`. Copy says last pulled — these are periodic government releases, not a tick stream.
 
 In-memory API (no Postgres) from the repo root:
 
@@ -62,7 +62,10 @@ These query keys are written with `history.pushState` when a person changes filt
 | `channel` | omitted | `university` · `community_college` · `trade` · `apprenticeship` · `automation` |
 | `q` | omitted | search over title, description, tags (300ms debounce) |
 | `insight` | omitted | insight id; opens the analysis drawer on the Market Insights tab |
-| `lens` | omitted (`All`) | Charts audience lens: `students` · `parents` · `counselors` · `workforce` (`stakeholder=` is an alias; raw tags like `career_counselors` also parse) |
+| `lens` | omitted (`All`) | Audience lens for the whole dashboard: `students` · `parents` · `counselors` · `workforce` (`stakeholder=` is an alias; raw tags like `career_counselors` also parse). Changes the decision line, which KPI tiles lead, and which chart metric is in front. |
+| `state` | omitted | State postal code or name. Narrows warehouse rows that have a state field. |
+| `cip` | omitted | CIP code or program title fragment. |
+| `outlook` | omitted | `grow` or `decline` for projection charts. Students default to growing and parents to declining when this is omitted. |
 | `range` | omitted (`30`) | Charts lookback: `7` · `14` · `30` · `90` (90-day history) |
 | `forecast` | omitted (`14`) | Charts forward band: `14` or `30` days |
 | `compare` | omitted (`trade,university`) | Two channels to compare, or `none` |

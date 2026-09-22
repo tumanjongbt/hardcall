@@ -1,15 +1,9 @@
-import {
-  AUDIENCE_LENSES,
-  CHANNELS,
-  CHANNEL_LABELS,
-  LENS_LABELS,
-} from "../channels";
-import type { AudienceLens, ChartRange, ViewState } from "../types";
-import { comparePairLabel, lensHint } from "./copy";
+import { CHANNELS, CHANNEL_LABELS } from "../channels";
+import type { ChartRange, ViewState } from "../types";
+import { comparePairLabel } from "./copy";
 import { RANGE_PRESETS } from "./transforms";
 
 export type ChartFilterHandlers = {
-  onLens: (lens: AudienceLens | null) => void;
   onRange: (range: ChartRange) => void;
   onToggleCompare: (channel: string) => void;
 };
@@ -64,33 +58,6 @@ export function renderChartFilters(
   root.replaceChildren();
   root.classList.add("chart-filters");
 
-  const lensField = el("fieldset", "chart-filter");
-  const lensLegend = el("legend", "control-label", "Audience lens");
-  lensLegend.id = "lens-label";
-  const lensRow = el("div", "chip-row");
-  lensRow.setAttribute("role", "radiogroup");
-  lensRow.setAttribute("aria-labelledby", "lens-label");
-  const allLens = chip("All", view.lens === null, () => handlers.onLens(null), "", {
-    radio: true,
-  });
-  lensRow.append(allLens);
-  for (const lens of AUDIENCE_LENSES) {
-    const button = chip(
-      LENS_LABELS[lens],
-      view.lens === lens,
-      () => handlers.onLens(lens),
-      "",
-      { radio: true }
-    );
-    button.dataset.lens = lens;
-    lensRow.append(button);
-  }
-  lensField.append(lensLegend, lensRow);
-  const hint = lensHint(view.lens ? LENS_LABELS[view.lens] : "All");
-  if (hint) {
-    lensField.append(el("p", "chart-filter__hint", hint));
-  }
-
   const rangeField = el("fieldset", "chart-filter");
   const rangeLegend = el("legend", "control-label", "Time range");
   rangeLegend.id = "range-label";
@@ -138,5 +105,5 @@ export function renderChartFilters(
   const compareNote = el("p", "chart-filter__hint", comparePairLabel(view.compare));
   compareField.append(compareLegend, compareRow, compareNote);
 
-  root.append(lensField, rangeField, compareField);
+  root.append(rangeField, compareField);
 }
