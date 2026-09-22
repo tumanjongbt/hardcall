@@ -84,12 +84,18 @@ npx tsc --noEmit   # optional extra typecheck
 npm run migrate    # applies pending files in migrations/ (001_events, 002_insights, …)
 ```
 
-`schema_migrations` records each file stem (`001_events` … `007_reserved_live_sources`) so the runner is idempotent. Re-running skips already-applied files. The API (`npm start`) and ingest CLI apply pending files on boot using a **held client** and **one statement at a time**, so the Supabase transaction pooler can run 006/007 without a Render release command.
+`schema_migrations` records each file stem (`001_events` … `009_licenses_certs_econ`) so the runner is idempotent. Re-running skips already-applied files. The API (`npm start`) and ingest CLI apply pending files on boot using a **held client** and **one statement at a time**, so the Supabase transaction pooler can run 006–009 without a Render release command. `008` and `009` are `CREATE TABLE IF NOT EXISTS` only — they do not drop live warehouse rows.
 
-**Do you still need to paste 006/007 in Supabase?**
+## Warehouse read API
 
-- **No**, if Render logs show `006_domain_warehouse` / `007_reserved_live_sources` applied (or skipped as already applied) after deploy. Warehouse tables then exist; ingest can fill them. `GET /api/insights` should be 200 (empty list is OK until ingest writes live KPIs).
-- **Yes**, if boot migrate errors (permissions, stem recorded without the SQL, or a CHECK that needs a manual remap). Paste `migrations/006_domain_warehouse.sql` then `007_reserved_live_sources.sql` in the SQL editor and record the stems. GET `/api/insights` still returns 200 without those columns: it retries the pre-006 SELECT (`source` only, `source_url`/`fetched_at` null). It does **not** invent KPI rows.
+Public GET, paginated (`limit` default 50, max 200, plus `offset`). Every row has `source`, `source_url`, and `fetched_at`. Counts: `GET /api/warehouse` and `GET /api/meta`. Freshness: `GET /api/feeds` (`ok` / `stale` / `error`, with an honest cadence label). Lists: `/api/institutions`, `/api/programs`, `/api/sponsors`, `/api/occupations`, `/api/wages`, `/api/projections`, `/api/credentials`, `/api/licenses`, `/api/certifications`, `/api/econ`. Filters include `q`, `state`, `type`, `soc`, `outlook=grow|decline`, and `source`. Contract: `contracts/GET_api_warehouse.md`. Deploy notes: `docs/DEPLOY.md`.
+
+The live pull stays the Render cron (`node dist/ingest/cli.js --source all`). There is no public or token-protected `POST /api/ingest`. Provider keys stay on that worker. FRED is daily-ish. CareerOneStop is weekly. Census, BEA, Scorecard, OEWS, and Employment Projections are release-driven and still pulled on the schedule so `fetched_at` stays current.
+
+**Do you still need to paste 006–009 in Supabase?**
+
+- **No**, if Render logs show `006_domain_warehouse` through `009_licenses_certs_econ` applied (or skipped as already applied) after deploy. Warehouse tables then exist; ingest can fill them. `GET /api/insights` should be 200 (empty list is OK until ingest writes live KPIs).
+- **Yes**, if boot migrate errors (permissions, stem recorded without the SQL, or a CHECK that needs a manual remap). Paste `006` through `009` in order and record the stems. `008` and `009` do not drop existing rows. GET `/api/insights` still returns 200 without the 006 columns: it retries the pre-006 SELECT (`source` only, `source_url`/`fetched_at` null). It does **not** invent KPI rows.
 
 ```sql
 -- Only if boot migrate did not apply 006/007:

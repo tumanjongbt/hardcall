@@ -59,4 +59,22 @@ test("006 and 007 split into executable statements", () => {
   const statements007 = splitSqlStatements(sql007);
   assert.ok(statements007.some((stmt) => stmt.includes("'ipeds'")));
   assert.ok(statements007.some((stmt) => stmt.includes("'fred'")));
+
+  const sql008 = fs.readFileSync(path.join(dir, "008_credentials.sql"), "utf8");
+  const statements008 = splitSqlStatements(sql008);
+  assert.ok(
+    statements008.some((stmt) => /CREATE TABLE IF NOT EXISTS credentials/i.test(stmt))
+  );
+  assert.ok(statements008.every((stmt) => !/DROP TABLE/i.test(stmt)));
+
+  const sql009 = fs.readFileSync(path.join(dir, "009_licenses_certs_econ.sql"), "utf8");
+  const statements009 = splitSqlStatements(sql009);
+  assert.ok(statements009.some((stmt) => /CREATE TABLE IF NOT EXISTS licenses/i.test(stmt)));
+  assert.ok(
+    statements009.some((stmt) => /CREATE TABLE IF NOT EXISTS certifications/i.test(stmt))
+  );
+  assert.ok(
+    statements009.some((stmt) => /CREATE TABLE IF NOT EXISTS econ_indicators/i.test(stmt))
+  );
+  assert.ok(statements009.every((stmt) => !/DROP TABLE/i.test(stmt)));
 });
