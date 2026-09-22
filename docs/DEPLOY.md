@@ -57,6 +57,7 @@ Do **not** put API keys or `DATABASE_URL` in the Vite dashboard build. Keys belo
 | --- | --- | --- |
 | `DATABASE_URL` | all live runs | Supabase transaction pooler |
 | `HARDCALL_ALLOW_DEMO` | production | `false` |
+| `HARDCALL_INGEST_TOKEN` | `POST /api/ingest/:source` | Long random secret. Omit it and the route stays **401**. Never put this in the dashboard |
 | `CAREERONESTOP_USER_ID` | `--source careeronestop` (and `all` when set) | With the API token. [Register](https://www.careeronestop.org/Developers/WebAPI/registration.aspx) |
 | `CAREERONESTOP_API_TOKEN` | same | Bearer token. **Never persist Bing geocodes** |
 | `CAREERONESTOP_MAX_RECORDS` | optional | Default 200 licenses and 200 certifications per run |
@@ -89,7 +90,7 @@ Suggested schedule: daily `0 6 * * *` (`render.yaml`). That pull is what keeps `
 
 OEWS and Employment Projections are release-driven BLS products. This warehouse does not ingest a separate daily BLS time series; the daily-ish macro series are FRED. Credential Engine rows are read from the warehouse. There is no keyless Credential Engine pull in the cron.
 
-There is **no** `POST /api/ingest/:source`. The cron command above is the worker. It talks to Postgres with `DATABASE_URL` and the provider keys. Those keys stay off the public web process. A token-protected HTTP trigger would run Scorecard unzip inside the request path; do not add one.
+`POST /api/ingest/:source` is optional and closed unless `HARDCALL_INGEST_TOKEN` is set on the **web** service (Render env, `sync: false`, never `VITE_*`). Send it as `Authorization: Bearer <token>` or `X-Hardcall-Ingest-Token`. A missing or wrong token is **401** `{ "error": "unauthorized" }`. The body is ignored. `:source` is the same set as the CLI (`all`, `scorecard`, `bls`, `onet`, `bls_ep`, `apprenticeship_gov`, `careeronestop`, `census`, `bea`, `fred`). The handler runs `runIngest` on the server, so provider keys never travel in the request. URLs in the JSON report are redacted. The call stays open until that pull finishes; the daily cron above is still the scheduled path. Scorecard can take several minutes.
 
 First run after migrate (expect several minutes; Scorecard FoS unzip is ~150MB):
 

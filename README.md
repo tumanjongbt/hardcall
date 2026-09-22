@@ -90,7 +90,7 @@ npm run migrate    # applies pending files in migrations/ (001_events, 002_insig
 
 Public GET, paginated (`limit` default 50, max 200, plus `offset`). Every row has `source`, `source_url`, and `fetched_at`. Counts: `GET /api/warehouse` and `GET /api/meta`. Freshness: `GET /api/feeds` (`ok` / `stale` / `error`, with an honest cadence label). Lists: `/api/institutions`, `/api/programs`, `/api/sponsors`, `/api/occupations`, `/api/wages`, `/api/projections`, `/api/credentials`, `/api/licenses`, `/api/certifications`, `/api/econ`. Filters include `q`, `state`, `type`, `soc`, `outlook=grow|decline`, and `source`. Contract: `contracts/GET_api_warehouse.md`. Deploy notes: `docs/DEPLOY.md`.
 
-The live pull stays the Render cron (`node dist/ingest/cli.js --source all`). There is no public or token-protected `POST /api/ingest`. Provider keys stay on that worker. FRED is daily-ish. CareerOneStop is weekly. Census, BEA, Scorecard, OEWS, and Employment Projections are release-driven and still pulled on the schedule so `fetched_at` stays current.
+The daily pull stays the Render cron (`node dist/ingest/cli.js --source all`). `POST /api/ingest/:source` is an extra trigger for that same worker path: it requires `HARDCALL_INGEST_TOKEN` (`Authorization: Bearer` or `X-Hardcall-Ingest-Token`) and is **401** without it. The request body is ignored, so callers cannot pass API keys or a local file. Provider keys stay in the server environment and are redacted from the JSON report. FRED is daily-ish. CareerOneStop is weekly. Census, BEA, Scorecard, OEWS, and Employment Projections are release-driven and still pulled on the schedule so `fetched_at` stays current.
 
 **Do you still need to paste 006–009 in Supabase?**
 

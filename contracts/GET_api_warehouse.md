@@ -8,7 +8,18 @@ Default `limit` is **50**. Values above **200** are capped. `offset` is a non-ne
 { "error": "validation_failed", "details": [{ "field": "outlook", "rule": "enum" }] }
 ```
 
-`source` must be a warehouse source (`bls`, `onet`, `scorecard`, `apprenticeship_gov`, `bls_ep`, `ipeds`, `careeronestop`, `census`, `bea`, `fred`, `credential_engine`). `synthetic` is rejected. Anonymous `POST /api/events` and `POST /api/insight` still cannot mint reserved live sources. There is no `POST /api/ingest`.
+`source` must be a warehouse source (`bls`, `onet`, `scorecard`, `apprenticeship_gov`, `bls_ep`, `ipeds`, `careeronestop`, `census`, `bea`, `fred`, `credential_engine`). `synthetic` is rejected. Anonymous `POST /api/events` and `POST /api/insight` still cannot mint reserved live sources.
+
+## POST /api/ingest/:source
+
+Token-gated live pull. Not a public write.
+
+```
+POST /api/ingest/fred
+Authorization: Bearer <HARDCALL_INGEST_TOKEN>
+```
+
+`X-Hardcall-Ingest-Token` is accepted as well. The body is ignored. `:source` is `all` or one CLI adapter name. **401** `{ "error": "unauthorized" }` when the env token is unset, missing, or wrong. **400** when `:source` is not in the CLI set. **200** `{ "ok": true, "report": { "dryRun", "sources", "derivedEvents", "derivedInsights" } }` after the pull. `source_url` values are redacted (`api_key=REDACTED`). **500** `{ "error": "ingest_failed" }` does not include the token or provider keys. **503** `{ "error": "ingest_unavailable" }` when the process has a token but no runner.
 
 `channel` is applied only where the table can support it honestly:
 

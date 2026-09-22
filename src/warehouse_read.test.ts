@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
 import { createApp } from "./app";
+import type { IngestReport } from "./ingest/run";
+import { ingestTokenMatches } from "./ingest_auth";
 import { econFromAcs } from "./ingest/econ_rows";
 import { runIngest } from "./ingest/run";
 import {
@@ -401,7 +403,87 @@ test("demo-off insights hide synthetic and public POST still cannot mint reserve
       url: "/api/ingest/fred",
       headers: { authorization: "Bearer secret-token" },
     });
-    assert.equal(ingest.statusCode, 404);
+    assert.equal(ingest.statusCode, 401);
+    assert.deepEqual(ingest.json(), { error: "unauthorized" });
+    assert.equal(ingest.body.includes("secret-token"), false);
+  } finally {
+    await app.close();
+  }
+});
+
+test("POST /api/ingest/:source requires HARDCALL_INGEST_TOKEN and does not echo it", async () => {
+  assert.equal(ingestTokenMatches("secret-token", null), false);
+  assert.equal(ingestTokenMatches("", "secret-token"), false);
+  assert.equal(ingestTokenMatches("secret-token", "other-token"), false);
+  assert.equal(ingestTokenMatches("secret-token", "secret-token"), true);
+
+  const calls: string[] = [];
+  const report: IngestReport = {
+    dryRun: false,
+    sources: [
+      {
+        source: "fred",
+        source_url: "https://api.stlouisfed.org/fred/series/observations?api_key=SUPERSECRET",
+        fetched_at: FETCHED,
+        rows: 2,
+      },
+    ],
+    derivedEvents: 0,
+    derivedInsights: 1,
+  };
+  const app = createApp(insightStore(), {
+    allowDemo: false,
+    ingestToken: "secret-token",
+    runIngest: async (source) => {
+      calls.push(source);
+      if (source === "census") throw new Error("census key=SUPERSECRET failed");
+      return report;
+    },
+  });
+  await app.ready();
+  try {
+    const missing = await app.inject({ method: "POST", url: "/api/ingest/fred" });
+    assert.equal(missing.statusCode, 401);
+    assert.equal(calls.length, 0);
+
+    const wrong = await app.inject({
+      method: "POST",
+      url: "/api/ingest/fred",
+      headers: { "x-hardcall-ingest-token": "nope" },
+    });
+    assert.equal(wrong.statusCode, 401);
+    assert.equal(calls.length, 0);
+
+    const ok = await app.inject({
+      method: "POST",
+      url: "/api/ingest/fred",
+      headers: { authorization: "Bearer secret-token" },
+    });
+    assert.equal(ok.statusCode, 200);
+    assert.deepEqual(calls, ["fred"]);
+    const body = ok.json() as { ok: boolean; report: IngestReport };
+    assert.equal(body.ok, true);
+    assert.equal(body.report.sources[0]?.rows, 2);
+    assert.equal(body.report.sources[0]?.source_url.includes("SUPERSECRET"), false);
+    assert.match(body.report.sources[0]?.source_url ?? "", /api_key=REDACTED/);
+    assert.equal(ok.body.includes("secret-token"), false);
+
+    const badSource = await app.inject({
+      method: "POST",
+      url: "/api/ingest/not-a-feed",
+      headers: { authorization: "Bearer secret-token" },
+    });
+    assert.equal(badSource.statusCode, 400);
+    assert.equal(badSource.json().error, "validation_failed");
+
+    const failed = await app.inject({
+      method: "POST",
+      url: "/api/ingest/census",
+      headers: { authorization: "Bearer secret-token" },
+    });
+    assert.equal(failed.statusCode, 500);
+    assert.deepEqual(failed.json(), { error: "ingest_failed" });
+    assert.equal(failed.body.includes("SUPERSECRET"), false);
   } finally {
     await app.close();
   }
