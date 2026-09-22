@@ -45,7 +45,22 @@ DELETE FROM insights WHERE source = 'synthetic';
 | `HARDCALL_ALLOW_DEMO` | **`false`** |
 | `NODE_ENV` | `production` (Render sets this) |
 
-Do **not** put API keys or `DATABASE_URL` in the Vite dashboard build. Optional later keys (`SCORECARD_API_KEY`, `BLS_API_KEY`, `ONET_API_KEY`, `DOL_API_KEY`, `CAREERONESTOP_USER_ID`, `CAREERONESTOP_API_TOKEN`, `CENSUS_API_KEY`, `BEA_API_KEY`, `FRED_API_KEY`) stay on Render only. **Phase A is keyless bulk** (Scorecard zips, OEWS tables, O\*NET DB). CareerOneStop is Phase B and **must never persist Bing geocodes**.
+Do **not** put API keys or `DATABASE_URL` in the Vite dashboard build. Keys below stay on the Render **ingest cron** (and the API service only if it runs ingest). Never `VITE_*`.
+
+| Env var | Required for | Notes |
+| --- | --- | --- |
+| `DATABASE_URL` | all live runs | Supabase transaction pooler |
+| `HARDCALL_ALLOW_DEMO` | production | `false` |
+| `CAREERONESTOP_USER_ID` | `--source careeronestop` (and `all` when set) | With the API token. [Register](https://www.careeronestop.org/Developers/WebAPI/registration.aspx) |
+| `CAREERONESTOP_API_TOKEN` | same | Bearer token. **Never persist Bing geocodes** |
+| `CAREERONESTOP_MAX_RECORDS` | optional | Default 200 licenses and 200 certifications per run |
+| `CAREERONESTOP_WAGE_KEYWORD` | optional | SOC or title. Also set `CAREERONESTOP_WAGE_LOCATION` (state or ZIP) |
+| `CENSUS_API_KEY` | `--source census` | [Key signup](https://api.census.gov/data/key_signup.html). Optional `CENSUS_ACS_YEAR` (tries 2024, then 2023) |
+| `BEA_API_KEY` | `--source bea` | BEA UserID from [signup](https://apps.bea.gov/API/signup/index.html). Optional `BEA_GDP_TABLE` (default `SAGDP2N` line 1) and `BEA_INCOME_TABLE` (default `SAINC1` line 3) |
+| `FRED_API_KEY` | `--source fred` | Optional macro series `UNRATE`, `CPIAUCSL`. [API key](https://fred.stlouisfed.org/docs/api/api_key.html) |
+| `BLS_EP_URL` | optional | Override Employment Projections Table 1.2 URL |
+
+Phase A (`scorecard`, `bls` OEWS, `onet`) and `apprenticeship_gov` stay keyless. `bls_ep` is keyless but bls.gov often returns HTTP 403 from Render; use `--file` (below). `all` runs keyed adapters only when the matching env vars are set and logs a skip line otherwise. Credential Engine / CTDL is not configured: that registry needs its own account, and CareerOneStop certifications cover the credential list.
 
 Costs in the UI are **institution / program cost of attendance (College Scorecard)** — there is no national per-course price API.
 
@@ -66,13 +81,24 @@ node dist/ingest/cli.js --source apprenticeship_gov
 node dist/ingest/cli.js --source scorecard
 node dist/ingest/cli.js --source onet
 node dist/ingest/cli.js --source bls
+node dist/ingest/cli.js --source bls_ep
 ```
+
+With the Phase B/C keys set on the cron service, the same `all` command also runs `careeronestop`, `census`, `bea`, and `fred`. Without a key, that source is skipped and the log names the missing variable.
 
 If BLS returns HTTP 403 from the datacenter, download the national XLSX/TXT from https://www.bls.gov/oes/tables.htm (or Table 1 at https://www.bls.gov/news.release/ocwage.t01.htm) and rerun:
 
 ```bash
 node dist/ingest/cli.js --source bls --file /path/to/oes-table1.txt
 ```
+
+Employment Projections (growing and declining occupations) use the same bypass. Download Table 1.2 from https://www.bls.gov/emp/tables/occupational-projections-and-characteristics.htm (XLSX link on that page, or the HTML table) and rerun:
+
+```bash
+node dist/ingest/cli.js --source bls_ep --file /path/to/occupational-projections.xlsx
+```
+
+`.csv` and `.htm` exports of that table also parse. Employment is published in thousands; the warehouse stores persons. Annual openings are kept on derived insights (the `projections` table has employment and percent change, not an openings column).
 
 Dry-run without Postgres:
 

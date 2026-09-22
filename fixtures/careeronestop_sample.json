@@ -1,0 +1,86 @@
+{
+  "licenses": {
+    "LicenseList": [
+      {
+        "ID": "30-1179",
+        "Title": "Nursing - Registered Nurse",
+        "Description": "Registered nurses care for patients who are ill or injured.",
+        "State": "Montana",
+        "ActiveStatusDesc": "Active",
+        "LicenseAgency": {
+          "Name": "Board of Nursing",
+          "Address": "301 South Park, 4th Floor, PO Box 200513",
+          "City": "Helena",
+          "State": "MT",
+          "Zip": "59620-0513",
+          "Phone": "4068412397",
+          "Email": "dlibsdnur@mt.gov",
+          "Url": "http://boards.bsd.dli.mt.gov/nur"
+        }
+      },
+      {
+        "ID": "53-L93",
+        "Title": "Nurse",
+        "Description": "Individuals must have completed nursing school program, take nursing examination, list other states where person has practiced, file application and pay fee.",
+        "State": "Washington",
+        "ActiveStatusDesc": "Active",
+        "LicenseAgency": {
+          "Name": "Department of Health",
+          "City": "Tumwater",
+          "State": "WA",
+          "Phone": "3602364700",
+          "Email": "customerservice@cpaboard.wa.gov",
+          "Url": "http://www.doh.wa.gov"
+        }
+      }
+    ],
+    "RecordCount": 570
+  },
+  "certifications": {
+    "CertList": [
+      {
+        "Id": "5733-A",
+        "Name": "Nurse Manager and Leader",
+        "Url": "http://www.aone.org/resources/certification/about_certifications.shtml#cnml",
+        "Organization": "American Association of Critical-Care Nurses",
+        "Type": "Core",
+        "TypeOrder": "A"
+      }
+    ],
+    "RecordCount": 1
+  },
+  "wages": {
+    "OccupationDetail": {
+      "OccupationTitle": "Nurse Practitioners",
+      "OccupationCode": "291171",
+      "Wages": {
+        "NationalWagesList": [
+          {
+            "RateType": "Hourly",
+            "Median": "53.69",
+            "StFips": "00",
+            "Area": "000000",
+            "AreaName": "United States"
+          },
+          {
+            "RateType": "Annual",
+            "Median": "111680",
+            "StFips": "00",
+            "Area": "000000",
+            "AreaName": "United States"
+          }
+        ],
+        "StateWagesList": [
+          {
+            "RateType": "Annual",
+            "Median": "108530",
+            "StFips": "51",
+            "Area": "000051",
+            "AreaName": "Virginia"
+          }
+        ],
+        "WageYear": "2020"
+      }
+    }
+  }
+}

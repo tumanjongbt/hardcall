@@ -6,21 +6,15 @@ import {
   applyPendingMigrations,
   ensureInsightsProvenanceColumns,
 } from "../migrate";
-import { runIngest, type IngestSource } from "./run";
+import { INGEST_SOURCES, runIngest, type IngestSource } from "./run";
 import { createPgWarehouse } from "./warehouse";
 
-const SOURCES = new Set<IngestSource>([
-  "all",
-  "apprenticeship_gov",
-  "scorecard",
-  "bls",
-  "onet",
-]);
+const SOURCES = new Set<IngestSource>(INGEST_SOURCES);
 
 function usage(): string {
-  return `Usage: ingest --source <all|apprenticeship_gov|scorecard|bls|onet> [options]
+  return `Usage: ingest --source <all|apprenticeship_gov|scorecard|bls|onet|bls_ep|careeronestop|census|bea|fred> [options]
 
-Fetch official bulk feeds, upsert warehouse tables, and emit Events/Insights
+Fetch official feeds, upsert warehouse tables, and emit Events/Insights
 derived only from those rows (never invented). Reserved live sources are
 written here — public POST /api/events cannot mint them.
 
@@ -40,6 +34,19 @@ Env:
   SCORECARD_FIELD_OF_STUDY_URL
   ONET_OCCUPATION_URL       override O*NET Occupation Data CSV
   BLS_OEWS_URL              override OEWS Table 1 / file URL
+  BLS_EP_URL                override Employment Projections Table 1.2 URL
+  CAREERONESTOP_USER_ID     CareerOneStop user id (with API token)
+  CAREERONESTOP_API_TOKEN   CareerOneStop bearer token
+  CAREERONESTOP_MAX_RECORDS page cap (default 200); never stores Bing geocodes
+  CAREERONESTOP_WAGE_KEYWORD  optional SOC/title for wage compare
+  CAREERONESTOP_WAGE_LOCATION optional state or ZIP for wage compare
+  CENSUS_API_KEY            Census Data API key (ACS 5-year)
+  CENSUS_ACS_YEAR           optional ACS year (default try 2024 then 2023)
+  BEA_API_KEY               BEA UserID
+  FRED_API_KEY              optional FRED key (UNRATE, CPIAUCSL)
+
+--source all runs keyless feeds plus any Phase B/C adapter whose key is set.
+bls.gov often returns 403; use --source bls_ep --file PATH (.xlsx, .csv, or .htm).
 `;
 }
 
